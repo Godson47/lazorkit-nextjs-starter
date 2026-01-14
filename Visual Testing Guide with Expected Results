@@ -1,0 +1,537 @@
+# Visual Testing Guide
+
+## Step-by-Step Visual Guide
+
+### 1️⃣ Initial Setup (Terminal)
+
+**What you type:**
+```bash
+npx create-next-app@latest lazorkit-starter --typescript --tailwind --app
+cd lazorkit-starter
+npm install @lazorkit/wallet @solana/web3.js @solana/spl-token buffer
+```
+
+**What you should see:**
+```
+✔ Creating project in lazorkit-starter
+✔ Installing dependencies...
+✔ Initialized git repository
+
+added 342 packages in 45s
+```
+
+**✅ Success indicators:**
+- No error messages
+- "added XXX packages" message appears
+- New folder `lazorkit-starter` created
+
+---
+
+### 2️⃣ Starting Development Server
+
+**What you type:**
+```bash
+npm run dev
+```
+
+**What you should see:**
+```
+  ▲ Next.js 15.1.3
+  - Local:        http://localhost:3000
+  - Network:      http://192.168.1.x:3000
+
+ ✓ Starting...
+ ✓ Ready in 2.5s
+```
+
+**✅ Success indicators:**
+- "Ready in X.Xs" message
+- No compilation errors
+- Port 3000 is listening
+
+**❌ Common errors:**
+```
+Error: listen EADDRINUSE: address already in use :::3000
+```
+**Fix:** Another app is using port 3000. Run `npm run dev -- -p 3001` instead
+
+---
+
+### 3️⃣ Opening the Browser
+
+**What you do:**
+- Open browser
+- Go to http://localhost:3000
+
+**What you should see:**
+
+```
+┌──────────────────────────────────────┐
+│                                      │
+│      Lazorkit Starter               │
+│  Passkey-based Solana wallet demo   │
+│                                      │
+│  ┌────────────────────────────┐    │
+│  │                            │    │
+│  │  🔐 Connect Passkey Wallet │    │
+│  │                            │    │
+│  └────────────────────────────┘    │
+│                                      │
+└──────────────────────────────────────┘
+```
+
+**✅ Success indicators:**
+- Page loads without errors
+- Button is visible and clickable
+- No console errors (press F12 to check)
+
+**❌ If you see:**
+- Blank page → Check browser console for errors
+- "Cannot find module" → Dependencies not installed correctly
+- Connection refused → Dev server not running
+
+---
+
+### 4️⃣ Clicking Connect Button
+
+**What you do:**
+- Click "🔐 Connect Passkey Wallet" button
+
+**What happens:**
+1. Button text changes to "Connecting..."
+2. A new window/popup opens (Lazorkit Portal)
+3. Portal shows passkey creation interface
+
+**What the Portal looks like:**
+```
+┌──────────────────────────────────────┐
+│         Lazorkit Portal              │
+├──────────────────────────────────────┤
+│                                      │
+│  Create your Solana wallet           │
+│                                      │
+│  🔐 Use biometric authentication     │
+│     to secure your wallet            │
+│                                      │
+│  ┌────────────────────────────┐    │
+│  │   Create with Face ID      │    │
+│  └────────────────────────────┘    │
+│                                      │
+│  ┌────────────────────────────┐    │
+│  │   Create with Touch ID     │    │
+│  └────────────────────────────┘    │
+│                                      │
+└──────────────────────────────────────┘
+```
+
+**✅ Success indicators:**
+- Portal opens in new window/tab
+- No CORS errors in console
+- Options for biometric auth appear
+
+---
+
+### 5️⃣ Biometric Authentication
+
+**What you do:**
+- Choose your biometric method
+- Authenticate (Face ID, Touch ID, Windows Hello)
+
+**What you see - Mac (Touch ID):**
+```
+┌──────────────────────────────────┐
+│     Touch ID Required            │
+│                                  │
+│  [  Fingerprint sensor icon  ]  │
+│                                  │
+│  Place your finger on the        │
+│  Touch ID sensor to continue     │
+│                                  │
+│         [Cancel]                 │
+└──────────────────────────────────┘
+```
+
+**What you see - Windows Hello:**
+```
+┌──────────────────────────────────┐
+│     Windows Security             │
+│                                  │
+│  [      Face icon      ]         │
+│                                  │
+│  Look directly at your camera    │
+│  to verify it's you              │
+│                                  │
+│         [Cancel]                 │
+└──────────────────────────────────┘
+```
+
+**What you see - iPhone:**
+```
+┌──────────────────────────────────┐
+│     Face ID                      │
+│                                  │
+│  [  Face outline animation  ]    │
+│                                  │
+│  Position your face in frame     │
+│                                  │
+└──────────────────────────────────┘
+```
+
+**✅ After successful authentication:**
+- Portal closes automatically
+- Original page shows "Connected" state
+- Wallet address appears
+
+---
+
+### 6️⃣ Connected State
+
+**What you should see:**
+
+```
+┌──────────────────────────────────────┐
+│      Lazorkit Starter               │
+│  Passkey-based Solana wallet demo   │
+│                                      │
+│  ┌────────────────────────────┐    │
+│  │ ✅ Connected & Secured     │    │
+│  ├────────────────────────────┤    │
+│  │ Smart Wallet Address:      │    │
+│  │                            │    │
+│  │  HWv7Pg...8nKx [📋]       │    │
+│  │                            │    │
+│  ├────────────────────────────┤    │
+│  │  [Disconnect]              │    │
+│  └────────────────────────────┘    │
+└──────────────────────────────────────┘
+```
+
+**✅ Success indicators:**
+- Green checkmark visible
+- Full wallet address displayed
+- Address looks like: `HWv7Pg2fgZ8nKx...` (44 characters)
+- Disconnect button visible
+
+**Browser console should show:**
+```javascript
+✅ Wallet connected successfully!
+```
+
+---
+
+### 7️⃣ Testing Page Reload
+
+**What you do:**
+- Press F5 (or Cmd+R on Mac) to reload
+
+**What you should see:**
+- Brief "loading" state
+- Page automatically shows "Connected" state
+- **No new authentication prompt needed!**
+- Same wallet address as before
+
+**✅ This proves session persistence works!**
+
+**Browser console should show:**
+```javascript
+Session restored from storage
+Wallet auto-reconnected
+```
+
+---
+
+### 8️⃣ Getting Test SOL
+
+**What you do:**
+1. Copy your wallet address (click 📋 button)
+2. Open https://faucet.solana.com/
+3. Paste address
+4. Select "Devnet"
+5. Click "Airdrop 2 SOL"
+
+**What the faucet shows:**
+```
+┌──────────────────────────────────────┐
+│     Solana Faucet                    │
+├──────────────────────────────────────┤
+│  Network: [Devnet ▼]                 │
+│                                      │
+│  Address:                            │
+│  [HWv7Pg2fgZ8nKx...]                │
+│                                      │
+│  Amount: 2 SOL                       │
+│                                      │
+│  [  Request Airdrop  ]              │
+│                                      │
+│  ✅ Airdrop successful!              │
+│  Txn: abc123...xyz                   │
+└──────────────────────────────────────┘
+```
+
+**✅ Success indicators:**
+- "Airdrop successful" message
+- Transaction signature shown
+- Wait 30-60 seconds for confirmation
+
+---
+
+### 9️⃣ Sending Transaction
+
+**What you do:**
+1. Scroll to "Gasless Transfer" section
+2. Enter recipient address (can be your own)
+3. Enter amount: `0.001`
+4. Click "⚡ Send SOL (Gasless)"
+
+**What you should see:**
+
+```
+┌──────────────────────────────────────┐
+│     Gasless Transfer                │
+├──────────────────────────────────────┤
+│  Recipient Address:                  │
+│  [HWv7Pg2fgZ8nKx...]                │
+│                                      │
+│  Amount (SOL):                       │
+│  [0.001]                            │
+│                                      │
+│  💡 Gasless! Paymaster pays fees    │
+│                                      │
+│  [  ⚡ Send SOL (Gasless)  ]        │
+└──────────────────────────────────────┘
+```
+
+**After clicking Send:**
+1. Button shows "Sending..."
+2. Biometric prompt appears again
+3. After authenticating: Success message!
+
+**Success screen:**
+```
+┌──────────────────────────────────────┐
+│  ✅ Transaction Successful!          │
+│                                      │
+│  Transaction Signature:              │
+│  5KzN8...Hj2p                       │
+│                                      │
+│  [ View on Solana Explorer → ]      │
+└──────────────────────────────────────┘
+```
+
+**✅ Success indicators:**
+- Green success box appears
+- Transaction signature displayed (64 characters)
+- Explorer link is clickable
+
+**Browser console should show:**
+```javascript
+🔄 Building transaction...
+✍️ Signing transaction with paymaster...
+✅ Transaction sent! Signature: 5KzN8...Hj2p
+```
+
+---
+
+### 🔟 Verifying on Explorer
+
+**What you do:**
+- Click "View on Solana Explorer →"
+
+**What you should see:**
+
+```
+┌──────────────────────────────────────┐
+│    explorer.solana.com/tx/...       │
+├──────────────────────────────────────┤
+│  Transaction Details                 │
+│                                      │
+│  Status: ✅ Success                  │
+│  Block: 123456789                    │
+│  Fee: 0.000005 SOL                  │
+│  Fee Payer: <Paymaster Address>     │
+│                                      │
+│  Instructions:                       │
+│  1. Transfer SOL                     │
+│     From: HWv7Pg2...                 │
+│     To: HWv7Pg2...                   │
+│     Amount: 0.001 SOL               │
+└──────────────────────────────────────┘
+```
+
+**✅ Success indicators:**
+- Status shows "✅ Success" (green)
+- Fee Payer is NOT your wallet (it's the paymaster!)
+- Transaction details match what you sent
+
+---
+
+## 🎯 Complete Test Checklist
+
+Use this checklist to verify everything works:
+
+### Initial Setup
+- [ ] Dependencies installed without errors
+- [ ] Dev server starts successfully
+- [ ] Page loads at localhost:3000
+- [ ] No console errors
+
+### Wallet Connection
+- [ ] Connect button visible
+- [ ] Portal opens when clicked
+- [ ] Biometric prompt appears
+- [ ] Authentication works
+- [ ] Wallet address displayed
+- [ ] Console shows "connected" message
+
+### Session Persistence
+- [ ] Page reload keeps connection
+- [ ] No re-authentication needed
+- [ ] Same address after reload
+- [ ] Console shows "restored" message
+
+### Gasless Transaction
+- [ ] Transfer form visible when connected
+- [ ] Can enter recipient address
+- [ ] Can enter amount
+- [ ] Send button works
+- [ ] Biometric prompt for signing
+- [ ] Success message appears
+- [ ] Transaction signature shown
+- [ ] Explorer link works
+
+### Explorer Verification
+- [ ] Transaction shows "Success"
+- [ ] Fee payer is paymaster (not you)
+- [ ] Amount matches what you sent
+- [ ] Block number visible
+
+---
+
+## 🐛 Troubleshooting Visual Guide
+
+### Problem: Blank Page
+
+**What you see:**
+```
+┌──────────────────────────────────────┐
+│                                      │
+│                                      │
+│          (nothing here)              │
+│                                      │
+│                                      │
+└──────────────────────────────────────┘
+```
+
+**Fix:**
+1. Press F12 to open developer tools
+2. Click "Console" tab
+3. Look for red error messages
+4. Most common: "Buffer is not defined"
+5. Solution: Add Buffer polyfill to providers.tsx
+
+---
+
+### Problem: Portal Doesn't Open
+
+**What you see:**
+- Button shows "Connecting..." forever
+- No popup appears
+
+**Fix:**
+1. Check if popup blockers are enabled
+2. Check console for CORS errors
+3. Verify NEXT_PUBLIC_PORTAL_URL is set correctly
+4. Try in incognito/private mode
+
+---
+
+### Problem: Transaction Fails
+
+**What you see:**
+```
+┌──────────────────────────────────────┐
+│  ❌ Transaction Failed               │
+│                                      │
+│  Error: Insufficient funds           │
+└──────────────────────────────────────┘
+```
+
+**Fix:**
+1. Get SOL from faucet first
+2. Wait for airdrop to confirm (30-60 seconds)
+3. Try sending smaller amount
+4. Check you're on Devnet, not Mainnet
+
+---
+
+## 📸 Screenshot Comparison
+
+### ✅ What Success Looks Like
+
+**Terminal:**
+```
+✓ Ready in 2.1s
+○ Compiling / ...
+✓ Compiled / in 1.2s
+```
+
+**Browser:**
+- No errors in console
+- UI elements are styled with Tailwind
+- Buttons have hover effects
+- Text is readable and well-spaced
+
+**After Transaction:**
+- Green success box
+- 64-character signature
+- Clickable explorer link
+
+### ❌ What Failure Looks Like
+
+**Terminal:**
+```
+✗ Failed to compile
+./app/page.tsx
+Module not found: Can't resolve '@lazorkit/wallet'
+```
+
+**Browser:**
+- Console full of red errors
+- Text/buttons unstyled
+- Components not rendering
+- "Module not found" errors
+
+---
+
+## 🎓 Learning Outcomes
+
+After completing this guide, you should be able to:
+
+1. ✅ Set up a Next.js project with Lazorkit
+2. ✅ Integrate passkey authentication
+3. ✅ Send gasless transactions
+4. ✅ Debug common issues
+5. ✅ Verify transactions on-chain
+6. ✅ Understand session persistence
+
+---
+
+## 🎉 Congratulations!
+
+If you've made it through all steps and see the success indicators, you now have:
+
+- ✅ A working passkey wallet
+- ✅ Gasless transaction capability
+- ✅ Session persistence
+- ✅ Understanding of the Lazorkit SDK
+- ✅ Foundation for building Web3 apps
+
+**Next steps:**
+1. Customize the UI
+2. Add more features (token swaps, NFTs, etc.)
+3. Deploy to production
+4. Build your dApp!
+
+---
+
+**Need help?** Join the Lazorkit Telegram: https://t.me/lazorkit
