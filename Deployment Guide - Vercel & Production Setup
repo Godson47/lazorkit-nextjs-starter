@@ -1,0 +1,448 @@
+# Deployment Guide
+
+This guide covers deploying your Lazorkit Next.js starter to production.
+
+## 📋 Pre-Deployment Checklist
+
+Before deploying, ensure:
+
+- [ ] All environment variables are configured
+- [ ] Code is pushed to GitHub repository
+- [ ] Dependencies are up to date (`npm install`)
+- [ ] Build succeeds locally (`npm run build`)
+- [ ] TypeScript checks pass (`npm run type-check`)
+- [ ] All tutorials are documented in `/docs` folder
+
+## 🚀 Deploy to Vercel (Recommended)
+
+Vercel is the easiest way to deploy Next.js applications.
+
+### Step 1: Prepare Your Repository
+
+1. Create a new GitHub repository:
+```bash
+git init
+git add .
+git commit -m "Initial commit - Lazorkit Next.js starter"
+git branch -M main
+git remote add origin https://github.com/yourusername/lazorkit-nextjs-starter.git
+git push -u origin main
+```
+
+### Step 2: Deploy to Vercel
+
+#### Option A: Using Vercel Dashboard
+
+1. Go to [vercel.com](https://vercel.com)
+2. Click "New Project"
+3. Import your GitHub repository
+4. Configure your project:
+   - **Framework Preset**: Next.js (auto-detected)
+   - **Root Directory**: `./` (unless your code is in a subfolder)
+   - **Build Command**: `npm run build` (default)
+   - **Output Directory**: `.next` (default)
+
+5. Add Environment Variables:
+   ```
+   NEXT_PUBLIC_RPC_URL=https://api.devnet.solana.com
+   NEXT_PUBLIC_PORTAL_URL=https://portal.lazor.sh
+   NEXT_PUBLIC_PAYMASTER_URL=https://kora.devnet.lazorkit.com
+   ```
+
+6. Click "Deploy"
+
+#### Option B: Using Vercel CLI
+
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Login to Vercel
+vercel login
+
+# Deploy
+vercel
+
+# Follow the prompts:
+# - Set up and deploy? Y
+# - Link to existing project? N
+# - Project name: lazorkit-nextjs-starter
+# - Directory: ./
+# - Override settings? N
+
+# After deployment, add environment variables:
+vercel env add NEXT_PUBLIC_RPC_URL
+# Enter value: https://api.devnet.solana.com
+
+vercel env add NEXT_PUBLIC_PORTAL_URL
+# Enter value: https://portal.lazor.sh
+
+vercel env add NEXT_PUBLIC_PAYMASTER_URL
+# Enter value: https://kora.devnet.lazorkit.com
+
+# Redeploy with environment variables
+vercel --prod
+```
+
+### Step 3: Configure Custom Domain (Optional)
+
+1. In Vercel Dashboard, go to your project
+2. Click "Settings" → "Domains"
+3. Add your custom domain
+4. Update DNS records as instructed
+
+### Step 4: Verify Deployment
+
+1. Visit your deployed URL (e.g., `https://lazorkit-starter.vercel.app`)
+2. Test passkey connection
+3. Test gasless transaction
+4. Check browser console for errors
+
+## 🔧 Alternative Deployment Platforms
+
+### Deploy to Netlify
+
+1. Install Netlify CLI:
+```bash
+npm install -g netlify-cli
+```
+
+2. Build your app:
+```bash
+npm run build
+```
+
+3. Deploy:
+```bash
+netlify deploy --prod --dir=.next
+```
+
+4. Add environment variables in Netlify Dashboard:
+   - Go to Site Settings → Build & Deploy → Environment
+   - Add the same variables as Vercel
+
+### Deploy to AWS Amplify
+
+1. Install Amplify CLI:
+```bash
+npm install -g @aws-amplify/cli
+```
+
+2. Initialize Amplify:
+```bash
+amplify init
+```
+
+3. Add hosting:
+```bash
+amplify add hosting
+```
+
+4. Deploy:
+```bash
+amplify publish
+```
+
+### Deploy to DigitalOcean App Platform
+
+1. Create a new app in DigitalOcean
+2. Connect your GitHub repository
+3. Configure build settings:
+   - Build Command: `npm run build`
+   - Run Command: `npm start`
+4. Add environment variables
+5. Deploy
+
+## 🔒 Production Environment Variables
+
+For production (Mainnet), update your environment variables:
+
+```env
+# Mainnet RPC URL (consider using a paid provider for better performance)
+NEXT_PUBLIC_RPC_URL=https://api.mainnet-beta.solana.com
+# or use a provider like Helius, Triton, QuickNode:
+# NEXT_PUBLIC_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
+
+# Lazorkit Portal URL (same for mainnet)
+NEXT_PUBLIC_PORTAL_URL=https://portal.lazor.sh
+
+# Mainnet Paymaster URL (if available)
+NEXT_PUBLIC_PAYMASTER_URL=https://kora.mainnet.lazorkit.com
+# Or remove this if not using paymaster on mainnet
+
+# Optional: Analytics
+NEXT_PUBLIC_ANALYTICS_ID=your_analytics_id
+```
+
+## ⚠️ Important Production Considerations
+
+### 1. RPC Provider Selection
+
+Free RPC endpoints have rate limits. For production, consider:
+
+- **Helius**: https://helius.xyz/
+- **Triton One**: https://triton.one/
+- **QuickNode**: https://quicknode.com/
+- **Alchemy**: https://alchemy.com/
+
+Example with Helius:
+```env
+NEXT_PUBLIC_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_API_KEY
+```
+
+### 2. Security Headers
+
+Add security headers in `next.config.js`:
+
+```javascript
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY'
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff'
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin'
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()'
+          }
+        ]
+      }
+    ]
+  }
+}
+
+module.exports = nextConfig
+```
+
+### 3. Error Monitoring
+
+Add error tracking with Sentry:
+
+```bash
+npm install @sentry/nextjs
+```
+
+```javascript
+// sentry.client.config.ts
+import * as Sentry from "@sentry/nextjs";
+
+Sentry.init({
+  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  tracesSampleRate: 1.0,
+  environment: process.env.NODE_ENV
+});
+```
+
+### 4. Analytics
+
+Add analytics with Vercel Analytics or Google Analytics:
+
+```bash
+npm install @vercel/analytics
+```
+
+```typescript
+// app/layout.tsx
+import { Analytics } from '@vercel/analytics/react';
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        {children}
+        <Analytics />
+      </body>
+    </html>
+  );
+}
+```
+
+## 📊 Performance Optimization
+
+### 1. Enable Compression
+
+Vercel automatically enables compression, but for other platforms:
+
+```javascript
+// next.config.js
+module.exports = {
+  compress: true
+}
+```
+
+### 2. Image Optimization
+
+Use Next.js Image component:
+
+```typescript
+import Image from 'next/image';
+
+<Image 
+  src="/logo.png" 
+  width={200} 
+  height={100} 
+  alt="Logo"
+  priority
+/>
+```
+
+### 3. Route Prefetching
+
+Next.js automatically prefetches links. Optimize with:
+
+```typescript
+<Link href="/dashboard" prefetch={true}>
+  Dashboard
+</Link>
+```
+
+### 4. Bundle Analysis
+
+Analyze your bundle size:
+
+```bash
+npm install @next/bundle-analyzer
+```
+
+```javascript
+// next.config.js
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+})
+
+module.exports = withBundleAnalyzer({
+  // your config
+})
+```
+
+Run analysis:
+```bash
+ANALYZE=true npm run build
+```
+
+## 🧪 Testing in Production
+
+### 1. Post-Deployment Checklist
+
+- [ ] Homepage loads correctly
+- [ ] Connect wallet works
+- [ ] Transaction signing works
+- [ ] Error handling works
+- [ ] Mobile responsiveness
+- [ ] Cross-browser compatibility (Chrome, Safari, Firefox)
+- [ ] Performance metrics (Lighthouse score > 90)
+
+### 2. Load Testing
+
+Use tools like:
+- **Lighthouse**: Built into Chrome DevTools
+- **WebPageTest**: https://webpagetest.org/
+- **GTmetrix**: https://gtmetrix.com/
+
+### 3. Monitoring
+
+Set up uptime monitoring:
+- **UptimeRobot**: https://uptimerobot.com/
+- **Pingdom**: https://pingdom.com/
+- **StatusCake**: https://statuscake.com/
+
+## 🔄 Continuous Deployment
+
+### GitHub Actions Workflow
+
+Create `.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy to Vercel
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run tests
+        run: npm test
+        
+      - name: Build
+        run: npm run build
+        
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+```
+
+## 🐛 Troubleshooting
+
+### Build Fails
+
+**Issue**: `Module not found: Can't resolve '@lazorkit/wallet'`
+
+**Solution**: Ensure dependency is installed:
+```bash
+npm install @lazorkit/wallet
+```
+
+### Environment Variables Not Working
+
+**Issue**: Variables are undefined in production
+
+**Solution**: 
+1. Ensure variables start with `NEXT_PUBLIC_`
+2. Redeploy after adding variables
+3. Check Vercel Dashboard → Settings → Environment Variables
+
+### WebAuthn Not Working
+
+**Issue**: Passkey creation fails
+
+**Solution**:
+1. Ensure site is served over HTTPS
+2. Check domain is whitelisted with Lazorkit
+3. Verify browser supports WebAuthn
+
+### RPC Rate Limiting
+
+**Issue**: Transactions fail with rate limit errors
+
+**Solution**: Upgrade to paid RPC provider or implement request caching
+
+## 📚 Additional Resources
+
+- [Vercel Documentation](https://vercel.com/docs)
+- [Next.js Deployment](https://nextjs.org/docs/deployment)
+- [Lazorkit Docs](https://docs.lazorkit.com/)
+- [Solana Cookbook](https://solanacookbook.com/)
+
+---
+
+**Success!** 🎉 Your Lazorkit Next.js starter is now deployed and ready for users!
