@@ -1,0 +1,403 @@
+# Tutorial 1: Creating a Passkey-Based Wallet
+
+**Time to complete:** 15-20 minutes  
+**Difficulty:** Beginner
+
+## What You'll Learn
+
+In this tutorial, you'll learn how to:
+- Set up the Lazorkit provider in Next.js
+- Create a passkey wallet using biometric authentication
+- Handle connection states and loading indicators
+- Display wallet information to users
+- Implement proper error handling
+
+## Why Passkeys?
+
+Traditional crypto wallets require users to:
+- ❌ Write down and secure a 12-24 word seed phrase
+- ❌ Install browser extensions or mobile apps
+- ❌ Manage private keys manually
+- ❌ Risk permanent loss if they lose their seed phrase
+
+With passkeys, users can:
+- ✅ Sign in with Face ID, Touch ID, or Windows Hello
+- ✅ No seed phrases to remember or lose
+- ✅ No browser extensions needed
+- ✅ Backed by device-level security (TPM/Secure Enclave)
+- ✅ Works across all their devices via cloud sync
+
+## Prerequisites
+
+- Next.js 14+ project initialized
+- Node.js 18+ installed
+- Modern browser with WebAuthn support
+
+## Step 1: Install Dependencies
+
+First, install the required packages:
+
+```bash
+npm install @lazorkit/wallet @solana/web3.js buffer
+```
+
+**What each package does:**
+- `@lazorkit/wallet` - Lazorkit SDK for passkey authentication
+- `@solana/web3.js` - Solana's JavaScript library
+- `buffer` - Polyfill for Node.js Buffer in the browser
+
+## Step 2: Configure Environment Variables
+
+Create a `.env.local` file:
+
+```env
+# Solana RPC URL - using Devnet for testing
+NEXT_PUBLIC_RPC_URL=https://api.devnet.solana.com
+
+# Lazorkit Portal URL - handles passkey authentication
+NEXT_PUBLIC_PORTAL_URL=https://portal.lazor.sh
+
+# Paymaster URL - enables gasless transactions
+NEXT_PUBLIC_PAYMASTER_URL=https://kora.devnet.lazorkit.com
+```
+
+**Why these URLs?**
+- **RPC URL**: Your app needs to communicate with the Solana blockchain
+- **Portal URL**: Lazorkit's portal handles the WebAuthn passkey creation flow
+- **Paymaster URL**: Optional service that pays transaction fees for your users
+
+## Step 3: Create the Lazorkit Provider
+
+Create `src/app/providers.tsx`:
+
+```typescript
+"use client";
+
+import React, { useEffect } from "react";
+import { LazorkitProvider } from "@lazorkit/wallet";
+import { Buffer } from "buffer";
+
+// Load configuration from environment variables
+const LAZORKIT_CONFIG = {
+  rpcUrl: process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com",
+  portalUrl: process.env.NEXT_PUBLIC_PORTAL_URL || "https://portal.lazor.sh",
+  paymasterUrl: process.env.NEXT_PUBLIC_PAYMASTER_URL,
+};
+
+export function AppProviders({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    // Buffer polyfill for browser environment
+    // Solana's web3.js expects Node.js globals that don't exist in browsers
+    if (typeof window !== "undefined" && !window.Buffer) {
+      window.Buffer = Buffer;
+    }
+  }, []);
+
+  return (
+    <LazorkitProvider
+      rpcUrl={LAZORKIT_CONFIG.rpcUrl}
+      portalUrl={LAZORKIT_CONFIG.portalUrl}
+      paymasterUrl={LAZORKIT_CONFIG.paymasterUrl}
+    >
+      {children}
+    </LazorkitProvider>
+  );
+}
+```
+
+**Key points:**
+- The `"use client"` directive is required for client-side React features
+- Buffer polyfill is necessary because `@solana/web3.js` expects Node.js globals
+- The provider wraps your entire app to make wallet functionality available everywhere
+
+## Step 4: Update Root Layout
+
+Modify `src/app/layout.tsx`:
+
+```typescript
+import type { Metadata } from "next";
+import { AppProviders } from "./providers";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Lazorkit Next.js Starter",
+  description: "Passkey-based Solana wallet with gasless transactions",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <AppProviders>{children}</AppProviders>
+      </body>
+    </html>
+  );
+}
+```
+
+## Step 5: Create the Connect Button Component
+
+Create `src/components/ConnectButton.tsx`:
+
+```typescript
+"use client";
+
+import { useWallet } from "@lazorkit/wallet";
+import { useState } from "react";
+
+export function ConnectButton() {
+  const { connect, disconnect, isConnected, isConnecting, error } = useWallet();
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const handleConnect = async () => {
+    try {
+      setLocalError(null);
+      
+      // Connect with paymaster enabled for gasless transactions
+      await connect({ feeMode: "paymaster" });
+      
+      console.log("✅ Wallet connected successfully!");
+    } catch (err) {
+      console.error("❌ Connection error:", err);
+      setLocalError(err instanceof Error ? err.message : "Failed to connect");
+    }
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      setLocalError(null);
+      await disconnect();
+      console.log("👋 Wallet disconnected");
+    } catch (err) {
+      console.error("❌ Disconnect error:", err);
+      setLocalError(err instanceof Error ? err.message : "Failed to disconnect");
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      {!isConnected ? (
+        <button
+          onClick={handleConnect}
+          disabled={isConnecting}
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium 
+                     hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed
+                     transition-colors"
+        >
+          {isConnecting ? "Connecting..." : "Connect Passkey Wallet"}
+        </button>
+      ) : (
+        <button
+          onClick={handleDisconnect}
+          className="px-6 py-3 bg-red-600 text-white rounded-lg font-medium 
+                     hover:bg-red-700 transition-colors"
+        >
+          Disconnect
+        </button>
+      )}
+
+      {/* Display errors */}
+      {(error || localError) && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-800 text-sm">
+            {error?.message || localError}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+**What's happening here:**
+1. `useWallet()` hook provides all wallet state and methods
+2. `connect({ feeMode: "paymaster" })` opens the passkey creation flow
+3. Browser prompts user for biometric authentication
+4. Lazorkit creates a smart wallet controlled by that passkey
+5. The wallet address is stored in the SDK and persists across sessions
+
+## Step 6: Create the Wallet Info Component
+
+Create `src/components/WalletInfo.tsx`:
+
+```typescript
+"use client";
+
+import { useWallet } from "@lazorkit/wallet";
+
+export function WalletInfo() {
+  const { smartWalletPubkey, isConnected, account } = useWallet();
+
+  if (!isConnected || !smartWalletPubkey) {
+    return (
+      <div className="p-6 bg-gray-50 rounded-lg border border-gray-200">
+        <p className="text-gray-600 text-center">
+          Connect your wallet to view details
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 bg-green-50 rounded-lg border border-green-200 space-y-4">
+      <div>
+        <h3 className="text-sm font-medium text-green-900 mb-2">
+          Smart Wallet Address
+        </h3>
+        <code className="block p-3 bg-white rounded border border-green-200 
+                        text-sm break-all font-mono text-green-800">
+          {smartWalletPubkey.toBase58()}
+        </code>
+      </div>
+
+      {account && (
+        <div>
+          <h3 className="text-sm font-medium text-green-900 mb-2">
+            Credential ID
+          </h3>
+          <code className="block p-3 bg-white rounded border border-green-200 
+                          text-sm break-all font-mono text-green-800">
+            {account.credentialId}
+          </code>
+        </div>
+      )}
+
+      <div className="pt-4 border-t border-green-200">
+        <p className="text-xs text-green-700">
+          ✅ Your wallet is secured by your device's biometric authentication
+        </p>
+      </div>
+    </div>
+  );
+}
+```
+
+## Step 7: Create the Main Page
+
+Update `src/app/page.tsx`:
+
+```typescript
+import { ConnectButton } from "@/components/ConnectButton";
+import { WalletInfo } from "@/components/WalletInfo";
+
+export default function Home() {
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 
+                    flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl space-y-8">
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl font-bold text-gray-900">
+            Lazorkit Next.js Starter
+          </h1>
+          <p className="text-lg text-gray-600">
+            Create a passkey wallet with biometric authentication
+          </p>
+        </div>
+
+        {/* Main Card */}
+        <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
+          <ConnectButton />
+          <WalletInfo />
+        </div>
+
+        {/* Instructions */}
+        <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+          <h3 className="font-semibold text-blue-900 mb-2">
+            How it works:
+          </h3>
+          <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800">
+            <li>Click "Connect Passkey Wallet"</li>
+            <li>Authenticate with Face ID, Touch ID, or Windows Hello</li>
+            <li>Your smart wallet is created instantly</li>
+            <li>No seed phrases, no browser extensions needed!</li>
+          </ol>
+        </div>
+      </div>
+    </main>
+  );
+}
+```
+
+## Step 8: Test Your Implementation
+
+1. Start the development server:
+```bash
+npm run dev
+```
+
+2. Open http://localhost:3000 in your browser
+
+3. Click "Connect Passkey Wallet"
+
+4. You should see your browser's biometric authentication prompt
+
+5. After authenticating, your wallet address will be displayed
+
+## Understanding the Flow
+
+Here's what happens when a user connects:
+
+```
+User clicks "Connect"
+    ↓
+useWallet().connect() is called
+    ↓
+Browser opens Lazorkit Portal (portal.lazor.sh)
+    ↓
+Portal triggers WebAuthn credential creation
+    ↓
+Browser shows biometric prompt (Face ID/Touch ID/etc.)
+    ↓
+User authenticates with biometrics
+    ↓
+WebAuthn creates a new passkey credential
+    ↓
+Lazorkit deploys a smart wallet on Solana
+    ↓
+Smart wallet address is returned to your app
+    ↓
+Wallet is connected and ready to use!
+```
+
+## Common Issues & Solutions
+
+### Issue: "Buffer is not defined."
+**Solution:** Ensure the Buffer polyfill is added in `providers.tsx` before the provider renders.
+
+### Issue: WebAuthn not working
+**Solution:** Ensure you're using HTTPS (localhost works too). WebAuthn requires a secure context.
+
+### Issue: Portal doesn't open
+**Solution:** Check the browser console for errors. Verify the `NEXT_PUBLIC_PORTAL_URL` is correct.
+
+### Issue: Connection succeeds, but wallet is null
+**Solution:** Wait for the `isConnected` state to be true before accessing wallet data.
+
+## Security Best Practices
+
+1. Never expose private keys**: Lazorkit handles key management - you never see or store private keys
+2. Use HTTPS in production**: WebAuthn requires secure contexts
+3. Validate user input**: Always validate addresses and amounts before transactions
+4 Handle errors gracefully**: Show clear error messages to users
+5. Test on multiple devices**: Ensure passkey sync works across users' devices
+
+## Next Steps
+
+Now that you have a working passkey wallet, proceed to:
+- Tutorial 2: Gasless USDC Transfers(./tutorial-02-gasless-transactions.md) - Learn how to send transactions without paying fees
+- Tutorial 3: Session Management(./tutorial-03-session-management.md) - Persist wallet sessions across browser tabs
+
+## Resources
+
+- [Lazorkit Documentation](https://docs.lazorkit.com/)
+- [WebAuthn Guide](https://webauthn.guide/)
+- [Solana Web3.js Docs](https://solana-labs.github.io/solana-web3.js/)
+
+---
+
+**Congratulations!** 🎉 You've successfully created a passkey-based Solana wallet with no seed phrases required!
