@@ -1,0 +1,448 @@
+# Complete Setup & Testing Guide
+
+## 🚀 Quick Start (5 Minutes)
+
+### Step 1: Create Project Directory
+
+```bash
+# Create a new directory
+mkdir lazorkit-nextjs-starter
+cd lazorkit-nextjs-starter
+
+# Initialize a new Next.js project
+npx create-next-app@latest . --typescript --tailwind --app --no-src-dir
+# When prompted:
+# ✔ Would you like to use ESLint? Yes
+# ✔ Would you like to use Turbopack? No
+# ✔ Would you like to customize the import alias? No
+```
+
+### Step 2: Install Dependencies
+
+```bash
+# Install Lazorkit SDK and Solana libraries
+npm install @lazorkit/wallet @solana/web3.js @solana/spl-token buffer
+
+# Or if you prefer yarn:
+yarn add @lazorkit/wallet @solana/web3.js @solana/spl-token buffer
+
+# Or pnpm:
+pnpm add @lazorkit/wallet @solana/web3.js @solana/spl-token buffer
+```
+
+### Step 3: Set Up Environment Variables
+
+Create a `.env.local` file in your project root:
+
+```bash
+# Create the file
+touch .env.local
+
+# Or on Windows:
+# type nul > .env.local
+```
+
+Add this content to `.env.local`:
+
+```env
+NEXT_PUBLIC_RPC_URL=https://api.devnet.solana.com
+NEXT_PUBLIC_PORTAL_URL=https://portal.lazor.sh
+NEXT_PUBLIC_PAYMASTER_URL=https://kora.devnet.lazorkit.com
+```
+
+### Step 4: Create the File Structure
+
+```bash
+# Create directories
+mkdir -p app/components app/hooks docs
+
+# Or on Windows:
+# mkdir app\components app\hooks docs
+```
+
+### Step 5: Create Core Files
+
+Now copy the code from the artifacts I provided earlier. Here's the file structure:
+
+```
+lazorkit-nextjs-starter/
+├── app/
+│   ├── layout.tsx          # Copy from "Complete Demo App" artifact
+│   ├── page.tsx            # Copy from "Complete Demo App" artifact
+│   ├── providers.tsx       # See below
+│   └── globals.css         # Default Next.js styles
+├── components/
+│   ├── ConnectButton.tsx   # Extract from Complete Demo
+│   ├── WalletInfo.tsx      # Extract from Complete Demo
+│   └── GaslessTransfer.tsx # Extract from Complete Demo
+├── docs/
+│   ├── tutorial-01-passkey-wallet.md
+│   ├── tutorial-02-gasless-transactions.md
+│   └── tutorial-03-session-management.md
+├── .env.local
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
+### Step 6: Create providers.tsx
+
+Create `app/providers.tsx`:
+
+```typescript
+"use client";
+
+import React, { useEffect } from "react";
+import { LazorkitProvider } from "@lazorkit/wallet";
+import { Buffer } from "buffer";
+
+const LAZORKIT_CONFIG = {
+  rpcUrl: process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com",
+  portalUrl: process.env.NEXT_PUBLIC_PORTAL_URL || "https://portal.lazor.sh",
+  paymasterUrl: process.env.NEXT_PUBLIC_PAYMASTER_URL,
+};
+
+export function AppProviders({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    if (typeof window !== "undefined" && !window.Buffer) {
+      window.Buffer = Buffer;
+    }
+  }, []);
+
+  return (
+    <LazorkitProvider
+      rpcUrl={LAZORKIT_CONFIG.rpcUrl}
+      portalUrl={LAZORKIT_CONFIG.portalUrl}
+      paymasterUrl={LAZORKIT_CONFIG.paymasterUrl}
+    >
+      {children}
+    </LazorkitProvider>
+  );
+}
+```
+
+### Step 7: Update layout.tsx
+
+Create/update `app/layout.tsx`:
+
+```typescript
+import type { Metadata } from "next";
+import { AppProviders } from "./providers";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Lazorkit Next.js Starter",
+  description: "Passkey-based Solana wallet demo",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <AppProviders>{children}</AppProviders>
+      </body>
+    </html>
+  );
+}
+```
+
+### Step 8: Use the Complete Demo Page
+
+Copy the entire `page.tsx` content from the "Complete Demo App" artifact I provided earlier into `app/page.tsx`.
+
+## ▶️ Run the Development Server
+
+```bash
+npm run dev
+
+# Or with yarn:
+yarn dev
+
+# Or with pnpm:
+pnpm dev
+```
+
+Open your browser to **http://localhost:3000**
+
+## ✅ Testing Checklist
+
+### Test 1: Passkey Wallet Connection
+
+1. **Click "Connect Passkey Wallet"**
+   - Expected: Browser shows biometric prompt (Face ID, Touch ID, Windows Hello)
+   
+2. **Authenticate with your biometric**
+   - Expected: Wallet connects, shows green checkmark
+   - Expected: Smart wallet address appears
+   
+3. **Check browser console**
+   ```
+   Expected output:
+   ✅ Wallet connected successfully!
+   ```
+
+4. **Refresh the page (F5)**
+   - Expected: Wallet automatically reconnects (no prompt needed!)
+
+### Test 2: Gasless Transaction
+
+1. **Get your wallet address**
+   - Copy the displayed smart wallet address
+
+2. **Get test SOL from faucet**
+   - Visit: https://faucet.solana.com/
+   - Paste your wallet address
+   - Click "Request Airdrop"
+   - Wait ~30 seconds
+
+3. **Send a transaction**
+   - In the app, enter a recipient address (you can use your own)
+   - Enter amount: `0.001` SOL
+   - Click "Send SOL (Gasless)"
+   - Approve with biometric
+   - Expected: Transaction succeeds, signature appears
+
+4. **View on Explorer**
+   - Click "View on Solana Explorer"
+   - Expected: Transaction details visible
+   - Expected: Fee paid by paymaster (not your wallet)
+
+### Test 3: Session Persistence
+
+1. **Connect wallet**
+2. **Open a new tab** with the same URL
+   - Expected: New tab also shows connected state
+3. **Close all tabs and reopen**
+   - Expected: Wallet reconnects automatically
+
+## 🐛 Troubleshooting
+
+### Issue: `npm run dev` fails with module errors
+
+**Solution:**
+```bash
+# Clear cache and reinstall
+rm -rf node_modules package-lock.json
+npm install
+npm run dev
+```
+
+### Issue: "Buffer is not defined"
+
+**Solution:** Make sure `app/providers.tsx` includes the Buffer polyfill:
+```typescript
+useEffect(() => {
+  if (typeof window !== "undefined" && !window.Buffer) {
+    window.Buffer = Buffer;
+  }
+}, []);
+```
+
+### Issue: "Cannot find module '@lazorkit/wallet'"
+
+**Solution:**
+```bash
+npm install @lazorkit/wallet --force
+```
+
+### Issue: WebAuthn doesn't work
+
+**Reasons:**
+- Not using HTTPS (localhost is OK)
+- Browser doesn't support WebAuthn
+- No biometric device available
+
+**Solution:**
+- Use Chrome, Safari, or Edge (latest versions)
+- Enable biometric authentication on your device
+- For testing without biometrics, use Windows Hello or security keys
+
+### Issue: Transaction fails
+
+**Check:**
+1. Wallet has SOL (get from faucet)
+2. Recipient address is valid
+3. Amount is reasonable (not too large)
+4. Network is Devnet (check .env.local)
+
+**Debug:**
+```typescript
+// Add to your transfer function
+console.log("Wallet:", smartWalletPubkey?.toBase58());
+console.log("Recipient:", recipient);
+console.log("Amount:", amount);
+```
+
+### Issue: Port 3000 already in use
+
+**Solution:**
+```bash
+# Use a different port
+npm run dev -- -p 3001
+
+# Or kill process on port 3000 (Unix/Mac):
+lsof -ti:3000 | xargs kill -9
+
+# Windows:
+netstat -ano | findstr :3000
+taskkill /PID <PID> /F
+```
+
+## 📱 Testing on Mobile
+
+### Option 1: Local Network
+
+1. **Find your local IP:**
+```bash
+# Mac/Linux
+ifconfig | grep "inet "
+
+# Windows
+ipconfig
+```
+
+2. **Start dev server on network:**
+```bash
+npm run dev -- -H 0.0.0.0
+```
+
+3. **Access from mobile:**
+```
+http://YOUR_IP:3000
+```
+
+### Option 2: ngrok (Recommended)
+
+```bash
+# Install ngrok
+npm install -g ngrok
+
+# Start your dev server
+npm run dev
+
+# In another terminal, create tunnel
+ngrok http 3000
+```
+
+Access the https URL from your phone!
+
+## 🧪 Advanced Testing
+
+### Test Error Handling
+
+1. **Invalid address:**
+   - Enter "invalid123" as recipient
+   - Expected: Error message appears
+
+2. **Insufficient balance:**
+   - Try sending more SOL than you have
+   - Expected: Error message appears
+
+3. **Network issues:**
+   - Turn off internet
+   - Try transaction
+   - Expected: Network error message
+
+### Test Performance
+
+1. **Open Chrome DevTools**
+2. **Go to Lighthouse tab**
+3. **Run audit**
+4. Expected scores:
+   - Performance: > 90
+   - Accessibility: > 90
+   - Best Practices: > 90
+
+## 🔍 Debugging Tips
+
+### Enable Verbose Logging
+
+Add to your component:
+
+```typescript
+useEffect(() => {
+  console.log("Wallet state:", {
+    isConnected,
+    isConnecting,
+    address: smartWalletPubkey?.toBase58(),
+    error: error?.message
+  });
+}, [isConnected, isConnecting, smartWalletPubkey, error]);
+```
+
+### Inspect Lazorkit State
+
+```typescript
+// In your component
+const wallet = useWallet();
+console.log("Full wallet state:", wallet);
+```
+
+### Check Environment Variables
+
+```typescript
+// In any component
+useEffect(() => {
+  console.log("Config:", {
+    rpcUrl: process.env.NEXT_PUBLIC_RPC_URL,
+    portalUrl: process.env.NEXT_PUBLIC_PORTAL_URL,
+    paymasterUrl: process.env.NEXT_PUBLIC_PAYMASTER_URL
+  });
+}, []);
+```
+
+## 📊 Browser Compatibility
+
+**Fully Supported:**
+- ✅ Chrome 67+ (Desktop & Mobile)
+- ✅ Safari 13+ (Desktop & Mobile)
+- ✅ Edge 18+
+- ✅ Firefox 60+
+
+**Not Supported:**
+- ❌ Internet Explorer
+- ❌ Opera Mini
+- ❌ Old Android browsers (< Android 9)
+
+## 🎯 What Success Looks Like
+
+When everything works correctly, you should see:
+
+1. ✅ Dev server starts without errors
+2. ✅ Page loads at localhost:3000
+3. ✅ No console errors
+4. ✅ Connect button appears
+5. ✅ Biometric prompt works
+6. ✅ Wallet address displays
+7. ✅ Transaction succeeds
+8. ✅ Explorer link works
+9. ✅ Session persists on reload
+
+## 🆘 Getting Help
+
+If you're still stuck:
+
+1. **Check browser console** for error messages
+2. **Check terminal** for build errors
+3. **Join Lazorkit Telegram**: https://t.me/lazorkit
+4. **Review docs**: https://docs.lazorkit.com/
+5. **GitHub issues**: https://github.com/lazor-kit/lazor-kit/issues
+
+## 📝 Next Steps After Setup
+
+Once everything works:
+
+1. ✅ Read Tutorial 1 (Passkey Wallet)
+2. ✅ Read Tutorial 2 (Gasless Transactions)
+3. ✅ Read Tutorial 3 (Session Management)
+4. ✅ Customize the UI for your needs
+5. ✅ Add your own features
+6. ✅ Deploy to Vercel
+
+---
+
+**You're all set!** 🎉 Start building amazing dApps with Lazorkit!
