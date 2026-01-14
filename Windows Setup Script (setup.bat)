@@ -1,0 +1,135 @@
+@echo off
+REM Lazorkit Next.js Starter - Automated Setup Script for Windows
+
+echo ========================================
+echo Lazorkit Next.js Starter - Setup Script
+echo ========================================
+echo.
+
+REM Check if Node.js is installed
+where node >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] Node.js is not installed. Please install Node.js 18+ first.
+    echo           Download from: https://nodejs.org/
+    pause
+    exit /b 1
+)
+
+echo [OK] Node.js version:
+node --version
+echo.
+
+REM Check if npm is installed
+where npm >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] npm is not installed. Please install npm first.
+    pause
+    exit /b 1
+)
+
+echo [OK] npm version:
+npm --version
+echo.
+
+REM Ask for project name
+set /p PROJECT_NAME="Enter project name (default: lazorkit-starter): "
+if "%PROJECT_NAME%"=="" set PROJECT_NAME=lazorkit-starter
+
+echo.
+echo Creating Next.js project: %PROJECT_NAME%
+echo.
+
+REM Create Next.js app
+call npx create-next-app@latest "%PROJECT_NAME%" --typescript --tailwind --app --no-src-dir --eslint --import-alias "@/*" --use-npm
+
+cd "%PROJECT_NAME%"
+
+echo.
+echo Installing Lazorkit SDK and dependencies...
+echo.
+
+REM Install dependencies
+call npm install @lazorkit/wallet @solana/web3.js @solana/spl-token buffer
+
+echo.
+echo Creating environment configuration...
+echo.
+
+REM Create .env.local
+(
+echo # Solana RPC URL ^(Devnet for testing^)
+echo NEXT_PUBLIC_RPC_URL=https://api.devnet.solana.com
+echo.
+echo # Lazorkit Portal URL
+echo NEXT_PUBLIC_PORTAL_URL=https://portal.lazor.sh
+echo.
+echo # Lazorkit Paymaster URL ^(for gasless transactions^)
+echo NEXT_PUBLIC_PAYMASTER_URL=https://kora.devnet.lazorkit.com
+) > .env.local
+
+echo [OK] Created .env.local with Devnet configuration
+echo.
+
+REM Create docs directory
+if not exist docs mkdir docs
+
+echo Creating project structure...
+echo.
+
+REM Create providers.tsx
+(
+echo "use client";
+echo.
+echo import React, { useEffect } from "react";
+echo import { LazorkitProvider } from "@lazorkit/wallet";
+echo import { Buffer } from "buffer";
+echo.
+echo const LAZORKIT_CONFIG = {
+echo   rpcUrl: process.env.NEXT_PUBLIC_RPC_URL ^|^| "https://api.devnet.solana.com",
+echo   portalUrl: process.env.NEXT_PUBLIC_PORTAL_URL ^|^| "https://portal.lazor.sh",
+echo   paymasterUrl: process.env.NEXT_PUBLIC_PAYMASTER_URL,
+echo };
+echo.
+echo export function AppProviders^({ children }: { children: React.ReactNode }^) {
+echo   useEffect^(^(^) =^> {
+echo     if ^(typeof window !== "undefined" ^&^& !window.Buffer^) {
+echo       window.Buffer = Buffer;
+echo     }
+echo   }, []^);
+echo.
+echo   return ^(
+echo     ^<LazorkitProvider
+echo       rpcUrl={LAZORKIT_CONFIG.rpcUrl}
+echo       portalUrl={LAZORKIT_CONFIG.portalUrl}
+echo       paymasterUrl={LAZORKIT_CONFIG.paymasterUrl}
+echo     ^>
+echo       {children}
+echo     ^</LazorkitProvider^>
+echo   ^);
+echo }
+) > app\providers.tsx
+
+echo [OK] Created app/providers.tsx
+echo.
+
+echo ========================================
+echo Setup complete!
+echo ========================================
+echo.
+echo Project created at: .\%PROJECT_NAME%
+echo.
+echo Next steps:
+echo.
+echo    cd %PROJECT_NAME%
+echo    npm run dev
+echo.
+echo    Then open: http://localhost:3000
+echo.
+echo To add full demo features:
+echo    1. Copy the complete page.tsx from artifacts
+echo    2. Add component files from artifacts
+echo    3. Copy tutorial files to /docs directory
+echo.
+echo Happy coding with Lazorkit!
+echo.
+pause
