@@ -1,0 +1,565 @@
+# Tutorial 2: Gasless USDC Transfers
+
+**Time to complete:** 20-25 minutes  
+**Difficulty:** Intermediate
+
+## What You'll Learn
+
+In this tutorial, you'll learn how to:
+- Create SPL Token transfer instructions
+- Use the paymaster for gasless transactions
+- Sign and send transactions with Lazorkit
+- Handle transaction confirmations
+- Display transaction status to users
+
+## Why Gasless Transactions?
+
+Traditional blockchain transactions require users to:
+- ❌ Hold native tokens (SOL) to pay transaction fees
+- ❌ Calculate exact fee amounts
+- ❌ Risk transactions failing due to insufficient balance
+- ❌ Understand gas optimization
+
+With Lazorkit's paymaster, users can:
+- ✅ Send transactions without holding SOL
+- ✅ Never worry about transaction fees
+- ✅ Experience true Web2-like UX
+- ✅ Focus on the application, not blockchain mechanics
+
+## Prerequisites
+
+- Completed [Tutorial 1: Creating a Passkey-Based Wallet](./tutorial-01-passkey-wallet.md)
+- Connected passkey wallet
+- Basic understanding of Solana transactions
+
+## Step 1: Install Additional Dependencies
+
+Install the SPL Token library:
+
+```bash
+npm install @solana/spl-token
+```
+
+## Step 2: Create the Gasless Transfer Component
+
+Create `src/components/GaslessTransfer.tsx`:
+
+```typescript
+"use client";
+
+import { useWallet } from "@lazorkit/wallet";
+import { 
+  PublicKey, 
+  SystemProgram, 
+  LAMPORTS_PER_SOL,
+  TransactionInstruction 
+} from "@solana/web3.js";
+import { 
+  createTransferInstruction,
+  getAssociatedTokenAddress,
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID
+} from "@solana/spl-token";
+import { useState } from "react";
+
+// USDC Mint address on Devnet
+const USDC_MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
+
+export function GaslessTransfer() {
+  const { 
+    signAndSendTransaction, 
+    smartWalletPubkey, 
+    isConnected,
+    isSigning 
+  } = useWallet();
+  
+  const [recipient, setRecipient] = useState("");
+  const [amount, setAmount] = useState("");
+  const [txSignature, setTxSignature] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  /**
+   * Handles the gasless USDC transfer
+   */
+  const handleTransfer = async () => {
+    if (!isConnected || !smartWalletPubkey) {
+      setError("Please connect your wallet first");
+      return;
+    }
+
+    if (!recipient || !amount) {
+      setError("Please enter recipient and amount");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      setTxSignature(null);
+
+      // Validate recipient address
+      let recipientPubkey: PublicKey;
+      try {
+        recipientPubkey = new PublicKey(recipient);
+      } catch (err) {
+        throw new Error("Invalid recipient address");
+      }
+
+      // Convert amount to smallest unit (USDC has 6 decimals)
+      const transferAmount = Math.floor(parseFloat(amount) * 1_000_000);
+      if (transferAmount <= 0) {
+        throw new Error("Amount must be greater than 0");
+      }
+
+      console.log("🔄 Building transaction...");
+      
+      // Get Associated Token Accounts
+      const senderAta = await getAssociatedTokenAddress(
+        USDC_MINT,
+        smartWalletPubkey
+      );
+
+      const recipientAta = await getAssociatedTokenAddress(
+        USDC_MINT,
+        recipientPubkey
+      );
+
+      console.log("📝 Sender ATA:", senderAta.toBase58());
+      console.log("📝 Recipient ATA:", recipientAta.toBase58());
+
+      // Create transfer instruction
+      const transferIx = createTransferInstruction(
+        senderAta,              // Source token account
+        recipientAta,           // Destination token account
+        smartWalletPubkey,      // Owner of source account
+        transferAmount,         // Amount in smallest unit
+        [],                     // Multi-signers (not used)
+        TOKEN_PROGRAM_ID        // SPL Token program
+      );
+
+      console.log("✍️ Signing transaction with paymaster...");
+      
+      // Sign and send with Lazorkit
+      // The paymaster will cover the transaction fees!
+      const signature = await signAndSendTransaction({
+        instructions: [transferIx]
+      });
+
+      console.log("✅ Transaction sent! Signature:", signature);
+      setTxSignature(signature);
+
+    } catch (err) {
+      console.error("❌ Transfer error:", err);
+      setError(err instanceof Error ? err.message : "Transfer failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Alternative: Simple SOL transfer (also gasless)
+   */
+  const handleSolTransfer = async () => {
+    if (!isConnected || !smartWalletPubkey) {
+      setError("Please connect your wallet first");
+      return;
+    }
+
+    if (!recipient || !amount) {
+      setError("Please enter recipient and amount");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      setTxSignature(null);
+
+      const recipientPubkey = new PublicKey(recipient);
+      const lamports = parseFloat(amount) * LAMPORTS_PER_SOL;
+
+      const transferIx = SystemProgram.transfer({
+        fromPubkey: smartWalletPubkey,
+        toPubkey: recipientPubkey,
+        lamports: lamports
+      });
+
+      const signature = await signAndSendTransaction({
+        instructions: [transferIx]
+      });
+
+      setTxSignature(signature);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Transfer failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!isConnected) {
+    return (
+      <div className="p-6 bg-yellow-50 rounded-lg border border-yellow-200">
+        <p className="text-yellow-800 text-center">
+          Please connect your wallet to send transactions
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="p-6 bg-white rounded-lg border border-gray-200 space-y-4">
+        <h2 className="text-xl font-semibold text-gray-900">
+          Gasless USDC Transfer
+        </h2>
+        
+        {/* Recipient Input */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Recipient Address
+          </label>
+          <input
+            type="text"
+            value={recipient}
+            onChange={(e) => setRecipient(e.target.value)}
+            placeholder="Enter Solana address"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg 
+                       focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        {/* Amount Input */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Amount (USDC)
+          </label>
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            step="0.01"
+            min="0"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg 
+                       focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        {/* Transfer Buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={handleTransfer}
+            disabled={isLoading || isSigning}
+            className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg 
+                       font-medium hover:bg-green-700 disabled:opacity-50 
+                       disabled:cursor-not-allowed transition-colors"
+          >
+            {isLoading ? "Sending..." : "Send USDC (Gasless)"}
+          </button>
+          
+          <button
+            onClick={handleSolTransfer}
+            disabled={isLoading || isSigning}
+            className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg 
+                       font-medium hover:bg-purple-700 disabled:opacity-50 
+                       disabled:cursor-not-allowed transition-colors"
+          >
+            {isLoading ? "Sending..." : "Send SOL (Gasless)"}
+          </button>
+        </div>
+
+        {/* Info Box */}
+        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <p className="text-sm text-blue-800">
+            💡 <strong>Gasless!</strong> The paymaster pays transaction fees for you.
+            You don't need any SOL in your wallet.
+          </p>
+        </div>
+      </div>
+
+      {/* Transaction Success */}
+      {txSignature && (
+        <div className="p-6 bg-green-50 rounded-lg border border-green-200 space-y-3">
+          <h3 className="font-semibold text-green-900">
+            ✅ Transaction Successful!
+          </h3>
+          <div>
+            <p className="text-sm text-green-700 mb-2">Transaction Signature:</p>
+            <code className="block p-3 bg-white rounded border border-green-200 
+                            text-xs break-all font-mono text-green-800">
+              {txSignature}
+            </code>
+          </div>
+          <a
+            href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block px-4 py-2 bg-green-600 text-white rounded-lg 
+                       text-sm font-medium hover:bg-green-700 transition-colors"
+          >
+            View on Solana Explorer →
+          </a>
+        </div>
+      )}
+
+      {/* Error Display */}
+      {error && (
+        <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+          <p className="text-red-800 text-sm">{error}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## Step 3: Understanding Transaction Instructions
+
+Let's break down how Solana transactions work with Lazorkit:
+
+### Basic Structure
+```typescript
+// 1. Create instruction(s)
+const instruction = SystemProgram.transfer({
+  fromPubkey: sender,
+  toPubkey: recipient,
+  lamports: amount
+});
+
+// 2. Sign and send with Lazorkit
+const signature = await signAndSendTransaction({
+  instructions: [instruction]  // Can include multiple instructions
+});
+```
+
+### SPL Token Transfer
+```typescript
+// Get Associated Token Accounts (ATA)
+const senderAta = await getAssociatedTokenAddress(
+  tokenMint,      // The token's mint address (e.g., USDC)
+  senderPubkey    // The wallet address
+);
+
+// Create transfer instruction
+const instruction = createTransferInstruction(
+  senderAta,      // Source token account
+  recipientAta,   // Destination token account
+  senderPubkey,   // Authority (who signs)
+  amount          // Amount in smallest unit (6 decimals for USDC)
+);
+```
+
+## Step 4: Add Component to Main Page
+
+Update `src/app/page.tsx` to include the transfer component:
+
+```typescript
+import { ConnectButton } from "@/components/ConnectButton";
+import { WalletInfo } from "@/components/WalletInfo";
+import { GaslessTransfer } from "@/components/GaslessTransfer";
+
+export default function Home() {
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-4xl mx-auto space-y-8 py-12">
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl font-bold text-gray-900">
+            Lazorkit Next.js Starter
+          </h1>
+          <p className="text-lg text-gray-600">
+            Gasless transactions powered by passkey authentication
+          </p>
+        </div>
+
+        {/* Wallet Connection */}
+        <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
+          <ConnectButton />
+          <WalletInfo />
+        </div>
+
+        {/* Gasless Transfer */}
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <GaslessTransfer />
+        </div>
+      </div>
+    </main>
+  );
+}
+```
+
+## Step 5: Testing Your Implementation
+
+### Get Test USDC
+
+1. Visit [Solana Faucet](https://faucet.solana.com/)
+2. Enter your wallet address (from WalletInfo component)
+3. Request Devnet SOL
+4. Use [SPL Token Faucet](https://spl-token-faucet.com/) to get test USDC
+
+### Test the Transfer
+
+1. Connect your passkey wallet
+2. Enter a recipient address (you can use your own address to test)
+3. Enter an amount (e.g., 0.01 USDC)
+4. Click "Send USDC (Gasless)"
+5. Approve the transaction in the passkey prompt
+6. Wait for confirmation
+7. View the transaction on Solana Explorer
+
+## Understanding the Paymaster Flow
+
+```
+User initiates transfer
+    ↓
+App creates transaction instruction
+    ↓
+signAndSendTransaction() is called
+    ↓
+Lazorkit builds transaction
+    ↓
+Lazorkit contacts paymaster
+    ↓
+Paymaster adds fee payment instruction
+    ↓
+User signs with passkey (only their instruction)
+    ↓
+Paymaster adds their signature (for fee payment)
+    ↓
+Complete transaction sent to Solana
+    ↓
+Transaction confirmed on-chain
+    ↓
+Signature returned to app
+```
+
+## Advanced: Multiple Instructions
+
+You can batch multiple instructions in a single transaction:
+
+```typescript
+const instructions = [
+  // First: Create recipient's token account if needed
+  createAssociatedTokenAccountInstruction(
+    payer,
+    recipientAta,
+    recipient,
+    tokenMint
+  ),
+  
+  // Second: Transfer tokens
+  createTransferInstruction(
+    senderAta,
+    recipientAta,
+    sender,
+    amount
+  ),
+  
+  // Third: Add a memo
+  new TransactionInstruction({
+    keys: [],
+    programId: new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"),
+    data: Buffer.from("Sent via Lazorkit!")
+  })
+];
+
+const signature = await signAndSendTransaction({ instructions });
+```
+
+## Error Handling Best Practices
+
+```typescript
+try {
+  const signature = await signAndSendTransaction({ instructions });
+  
+  // Wait for confirmation (optional)
+  const confirmation = await connection.confirmTransaction(signature);
+  
+  if (confirmation.value.err) {
+    throw new Error("Transaction failed on-chain");
+  }
+  
+  console.log("Transaction confirmed!");
+  
+} catch (err) {
+  if (err.message.includes("User rejected")) {
+    // User canceled the transaction
+    showError("Transaction canceled");
+  } else if (err.message.includes("insufficient")) {
+    // Insufficient balance
+    showError("Insufficient balance");
+  } else {
+    // Generic error
+    showError("Transaction failed. Please try again.");
+  }
+}
+```
+
+## Common Issues & Solutions
+
+### Issue: "Account does not exist"
+**Solution:** The recipient's token account doesn't exist. Add a `createAssociatedTokenAccountInstruction` before the transfer.
+
+### Issue: "Insufficient funds"
+**Solution:** Even with paymaster, you need tokens to transfer. Get test USDC from the faucet.
+
+### Issue: Transaction times out
+**Solution:** Network congestion. Retry the transaction or use a different RPC endpoint.
+
+### Issue: "Invalid public key"
+**Solution:** Validate the recipient address before creating instructions:
+```typescript
+try {
+  new PublicKey(address);
+} catch {
+  throw new Error("Invalid address");
+}
+```
+
+## Performance Optimization
+
+### 1. Reuse Token Accounts
+```typescript
+// Cache ATAs to avoid repeated lookups
+const ataCache = new Map<string, PublicKey>();
+
+async function getCachedAta(mint: PublicKey, owner: PublicKey) {
+  const key = `${mint.toBase58()}-${owner.toBase58()}`;
+  if (!ataCache.has(key)) {
+    ataCache.set(key, await getAssociatedTokenAddress(mint, owner));
+  }
+  return ataCache.get(key)!;
+}
+```
+
+### 2. Batch Transactions
+Group related operations into single transactions when possible.
+
+### 3. Optimistic UI Updates
+Update UI immediately, revert on error:
+```typescript
+setBalance(prev => prev - amount); // Optimistic update
+try {
+  await signAndSendTransaction({ instructions });
+} catch {
+  setBalance(prev => prev + amount); // Revert on error
+}
+```
+
+## Next Steps
+
+- **[Tutorial 3: Session Management](./tutorial-03-session-management.md)** - Learn how to persist wallet sessions
+- Explore token swaps with Raydium or Jupiter
+- Implement NFT minting with Metaplex
+- Add staking functionality
+
+## Resources
+
+- [Solana Cookbook](https://solanacookbook.com/)
+- [SPL Token Docs](https://spl.solana.com/token)
+- [Lazorkit Cookbook](https://lazorkit-cookbook.vercel.app/)
+
+---
+
+**Congratulations!** 🎉 You can now send gasless transactions on Solana with passkey authentication!
