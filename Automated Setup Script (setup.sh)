@@ -1,0 +1,315 @@
+#!/bin/bash
+
+# Lazorkit Next.js Starter - Automated Setup Script
+# This script automates the initial project setup
+
+set -e  # Exit on error
+
+echo "🚀 Lazorkit Next.js Starter - Setup Script"
+echo "==========================================="
+echo ""
+
+# Check if Node.js is installed
+if ! command -v node &> /dev/null; then
+    echo "❌ Node.js is not installed. Please install Node.js 18+ first."
+    echo "   Download from: https://nodejs.org/"
+    exit 1
+fi
+
+echo "✅ Node.js version: $(node --version)"
+echo ""
+
+# Check if npm is installed
+if ! command -v npm &> /dev/null; then
+    echo "❌ npm is not installed. Please install npm first."
+    exit 1
+fi
+
+echo "✅ npm version: $(npm --version)"
+echo ""
+
+# Ask for project name
+read -p "📁 Enter project name (default: lazorkit-starter): " PROJECT_NAME
+PROJECT_NAME=${PROJECT_NAME:-lazorkit-starter}
+
+echo ""
+echo "📦 Creating Next.js project: $PROJECT_NAME"
+echo ""
+
+# Create Next.js app
+npx create-next-app@latest "$PROJECT_NAME" \
+  --typescript \
+  --tailwind \
+  --app \
+  --no-src-dir \
+  --eslint \
+  --import-alias "@/*" \
+  --use-npm
+
+cd "$PROJECT_NAME"
+
+echo ""
+echo "📚 Installing Lazorkit SDK and dependencies..."
+echo ""
+
+# Install dependencies
+npm install @lazorkit/wallet @solana/web3.js @solana/spl-token buffer
+
+echo ""
+echo "⚙️  Creating environment configuration..."
+echo ""
+
+# Create .env.local
+cat > .env.local << 'EOF'
+# Solana RPC URL (Devnet for testing)
+NEXT_PUBLIC_RPC_URL=https://api.devnet.solana.com
+
+# Lazorkit Portal URL
+NEXT_PUBLIC_PORTAL_URL=https://portal.lazor.sh
+
+# Lazorkit Paymaster URL (for gasless transactions)
+NEXT_PUBLIC_PAYMASTER_URL=https://kora.devnet.lazorkit.com
+EOF
+
+echo "✅ Created .env.local with Devnet configuration"
+echo ""
+
+# Create docs directory
+mkdir -p docs
+
+echo "📝 Creating project structure..."
+echo ""
+
+# Create providers.tsx
+cat > app/providers.tsx << 'EOF'
+"use client";
+
+import React, { useEffect } from "react";
+import { LazorkitProvider } from "@lazorkit/wallet";
+import { Buffer } from "buffer";
+
+const LAZORKIT_CONFIG = {
+  rpcUrl: process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com",
+  portalUrl: process.env.NEXT_PUBLIC_PORTAL_URL || "https://portal.lazor.sh",
+  paymasterUrl: process.env.NEXT_PUBLIC_PAYMASTER_URL,
+};
+
+export function AppProviders({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    if (typeof window !== "undefined" && !window.Buffer) {
+      window.Buffer = Buffer;
+    }
+  }, []);
+
+  return (
+    <LazorkitProvider
+      rpcUrl={LAZORKIT_CONFIG.rpcUrl}
+      portalUrl={LAZORKIT_CONFIG.portalUrl}
+      paymasterUrl={LAZORKIT_CONFIG.paymasterUrl}
+    >
+      {children}
+    </LazorkitProvider>
+  );
+}
+EOF
+
+echo "✅ Created app/providers.tsx"
+
+# Update layout.tsx
+cat > app/layout.tsx << 'EOF'
+import type { Metadata } from "next";
+import { AppProviders } from "./providers";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Lazorkit Next.js Starter",
+  description: "Passkey-based Solana wallet with gasless transactions",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <AppProviders>{children}</AppProviders>
+      </body>
+    </html>
+  );
+}
+EOF
+
+echo "✅ Updated app/layout.tsx"
+
+# Create a simple demo page
+cat > app/page.tsx << 'EOF'
+"use client";
+
+import { useWallet } from "@lazorkit/wallet";
+
+export default function Home() {
+  const { connect, disconnect, isConnected, isConnecting, smartWalletPubkey, error } = useWallet();
+
+  const handleConnect = async () => {
+    try {
+      await connect({ feeMode: "paymaster" });
+      console.log("✅ Wallet connected!");
+    } catch (err) {
+      console.error("❌ Connection failed:", err);
+    }
+  };
+
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="max-w-2xl w-full space-y-8">
+        <div className="text-center space-y-4">
+          <h1 className="text-5xl font-bold text-gray-900">
+            Lazorkit Starter
+          </h1>
+          <p className="text-xl text-gray-600">
+            Passkey-based Solana wallet demo
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
+          {!isConnected ? (
+            <>
+              <div className="text-center space-y-4">
+                <p className="text-gray-600">
+                  Create a passkey wallet with biometric authentication
+                </p>
+              </div>
+              <button
+                onClick={handleConnect}
+                disabled={isConnecting}
+                className="w-full px-8 py-4 bg-blue-600 text-white rounded-xl 
+                         font-semibold text-lg hover:bg-blue-700 
+                         disabled:opacity-50 disabled:cursor-not-allowed 
+                         transition-all"
+              >
+                {isConnecting ? "Connecting..." : "🔐 Connect Passkey Wallet"}
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="space-y-4">
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <label className="block text-sm font-medium text-green-800 mb-2">
+                    Smart Wallet Address
+                  </label>
+                  <code className="block p-3 bg-white rounded text-sm font-mono break-all">
+                    {smartWalletPubkey?.toBase58()}
+                  </code>
+                </div>
+                <button
+                  onClick={disconnect}
+                  className="w-full px-6 py-3 bg-red-600 text-white rounded-lg 
+                           hover:bg-red-700 transition-colors"
+                >
+                  Disconnect
+                </button>
+              </div>
+            </>
+          )}
+
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-800">{error.message}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="text-center text-sm text-gray-600">
+          <p>✅ Setup complete! Now add the full demo components.</p>
+        </div>
+      </div>
+    </main>
+  );
+}
+EOF
+
+echo "✅ Created app/page.tsx with basic demo"
+
+# Create README
+cat > README.md << 'EOF'
+# Lazorkit Next.js Starter
+
+A Next.js starter template with Lazorkit SDK for passkey-based Solana wallets.
+
+## Quick Start
+
+```bash
+# Install dependencies (already done by setup script)
+npm install
+
+# Run development server
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000)
+
+## Next Steps
+
+1. Test the basic passkey connection
+2. Replace `app/page.tsx` with the complete demo from artifacts
+3. Add additional components from the artifacts
+4. Read the tutorials in `/docs`
+
+## Resources
+
+- [Lazorkit Documentation](https://docs.lazorkit.com/)
+- [Telegram Community](https://t.me/lazorkit)
+- [GitHub](https://github.com/lazor-kit/lazor-kit)
+
+## Environment Variables
+
+Configure in `.env.local`:
+
+```env
+NEXT_PUBLIC_RPC_URL=https://api.devnet.solana.com
+NEXT_PUBLIC_PORTAL_URL=https://portal.lazor.sh
+NEXT_PUBLIC_PAYMASTER_URL=https://kora.devnet.lazorkit.com
+```
+EOF
+
+echo "✅ Created README.md"
+echo ""
+
+# Create a simple tutorial placeholder
+cat > docs/README.md << 'EOF'
+# Tutorials
+
+This directory will contain detailed tutorials:
+
+1. `tutorial-01-passkey-wallet.md` - Creating passkey wallets
+2. `tutorial-02-gasless-transactions.md` - Sending gasless transactions
+3. `tutorial-03-session-management.md` - Managing wallet sessions
+
+Copy the tutorial content from the artifacts provided by Claude.
+EOF
+
+echo "✅ Created docs/README.md"
+echo ""
+
+echo "=========================================="
+echo "✅ Setup complete!"
+echo "=========================================="
+echo ""
+echo "📁 Project created at: ./$PROJECT_NAME"
+echo ""
+echo "🚀 Next steps:"
+echo ""
+echo "   cd $PROJECT_NAME"
+echo "   npm run dev"
+echo ""
+echo "   Then open: http://localhost:3000"
+echo ""
+echo "📚 To add full demo features:"
+echo "   1. Copy the complete page.tsx from artifacts"
+echo "   2. Add component files from artifacts"
+echo "   3. Copy tutorial files to /docs directory"
+echo ""
+echo "🎉 Happy coding with Lazorkit!"
+echo ""
