@@ -1,0 +1,624 @@
+# Tutorial 3: Session Persistence & Management
+
+**Time to complete:** 15-20 minutes  
+**Difficulty:** Intermediate
+
+## What You'll Learn
+
+In this tutorial, you'll learn how to:
+- Persist wallet sessions across page reloads
+- Implement auto-reconnect functionality
+- Handle session expiration gracefully
+- Manage multi-tab session synchronization
+- Implement secure session management best practices
+
+## Why Session Persistence Matters
+
+Without session persistence:
+- ❌ Users must reconnect every time they reload the page
+- ❌ Poor user experience with repeated authentication
+- ❌ Lost transaction state on page refresh
+- ❌ Difficulty maintaining app state
+
+With proper session management:
+- ✅ Seamless experience across page reloads
+- ✅ Auto-reconnect with existing credentials
+- ✅ Synchronized state across browser tabs
+- ✅ Secure, encrypted credential storage
+
+## How Lazorkit Handles Sessions
+
+Lazorkit automatically manages session persistence using:
+- **Browser Storage**: Encrypted credential data stored locally
+- **WebAuthn Credentials**: Passkeys stored in device secure enclave
+- **Smart Wallet Mapping**: Credential ID → Smart Wallet address
+- **Auto-Reconnect**: Automatic session restoration on page load
+
+## Step 1: Understanding Session State
+
+The `useWallet` hook provides session-related state:
+
+```typescript
+const {
+  isConnected,    // true if user has an active session
+  isConnecting,   // true during connection/reconnection
+  account,        // Current wallet account data
+  error           // Any session errors
+} = useWallet();
+```
+
+## Step 2: Implementing Auto-Reconnect
+
+Create `src/components/SessionManager.tsx`:
+
+```typescript
+"use client";
+
+import { useWallet } from "@lazorkit/wallet";
+import { useEffect, useState } from "react";
+
+export function SessionManager({ children }: { children: React.ReactNode }) {
+  const { isConnected, isConnecting, error, account } = useWallet();
+  const [sessionChecked, setSessionChecked] = useState(false);
+
+  useEffect(() => {
+    /**
+     * Lazorkit automatically attempts to restore the session on mount.
+     * We just need to track when this check completes.
+     */
+    if (!isConnecting) {
+      setSessionChecked(true);
+    }
+  }, [isConnecting]);
+
+  // Show loading state while checking for existing session
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 
+                          border-blue-600 mx-auto"></div>
+          <p className="text-gray-600">Checking session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Session check complete, render app
+  return <>{children}</>;
+}
+```
+
+**Key points:**
+- Lazorkit automatically attempts session restoration
+- We show a loading state during the check
+- Once complete, the app renders normally
+- If a session exists, `isConnected` will be true
+
+## Step 3: Add Session Status Component
+
+Create `src/components/SessionStatus.tsx`:
+
+```typescript
+"use client";
+
+import { useWallet } from "@lazorkit/wallet";
+import { useEffect, useState } from "react";
+
+export function SessionStatus() {
+  const { isConnected, account, error } = useWallet();
+  const [sessionAge, setSessionAge] = useState<string>("");
+
+  useEffect(() => {
+    if (!isConnected || !account) return;
+
+    // Track session duration
+    const startTime = Date.now();
+    
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const minutes = Math.floor(elapsed / 60);
+      const seconds = elapsed % 60;
+      setSessionAge(`${minutes}m ${seconds}s`);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isConnected, account]);
+
+  if (!isConnected) {
+    return (
+      <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+          <span className="text-sm text-gray-600">No active session</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 bg-green-50 rounded-lg border border-green-200 space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+        <span className="text-sm font-medium text-green-800">
+          Session Active
+        </span>
+      </div>
+
+      <div className="space-y-1 text-sm">
+        <div className="flex justify-between">
+          <span className="text-green-700">Duration:</span>
+          <span className="font-mono text-green-900">{sessionAge}</span>
+        </div>
+        
+        {account?.credentialId && (
+          <div className="flex justify-between">
+            <span className="text-green-700">Credential:</span>
+            <span className="font-mono text-green-900 truncate max-w-[200px]">
+              {account.credentialId.slice(0, 12)}...
+            </span>
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="pt-2 border-t border-green-200">
+          <p className="text-xs text-red-600">⚠️ {error.message}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## Step 4: Handling Session Expiration
+
+Create `src/hooks/useSessionExpiry.ts`:
+
+```typescript
+"use client";
+
+import { useWallet } from "@lazorkit/wallet";
+import { useEffect, useCallback, useState } from "react";
+
+interface UseSessionExpiryOptions {
+  /** Duration in milliseconds before showing warning */
+  warningThreshold?: number;
+  /** Duration in milliseconds before force disconnect */
+  expiryDuration?: number;
+  /** Callback when session is about to expire */
+  onWarning?: () => void;
+  /** Callback when session expires */
+  onExpiry?: () => void;
+}
+
+export function useSessionExpiry(options: UseSessionExpiryOptions = {}) {
+  const {
+    warningThreshold = 30 * 60 * 1000, // 30 minutes
+    expiryDuration = 60 * 60 * 1000,   // 60 minutes
+    onWarning,
+    onExpiry
+  } = options;
+
+  const { isConnected, disconnect } = useWallet();
+  const [showWarning, setShowWarning] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+
+  const extendSession = useCallback(() => {
+    // Reset warning and update last activity time
+    setShowWarning(false);
+    setTimeRemaining(null);
+    
+    // Store activity timestamp
+    if (typeof window !== "undefined") {
+      localStorage.setItem("lazorkit_last_activity", Date.now().toString());
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isConnected) {
+      setShowWarning(false);
+      setTimeRemaining(null);
+      return;
+    }
+
+    // Initialize last activity
+    if (typeof window !== "undefined") {
+      const lastActivity = localStorage.getItem("lazorkit_last_activity");
+      if (!lastActivity) {
+        localStorage.setItem("lazorkit_last_activity", Date.now().toString());
+      }
+    }
+
+    const checkExpiry = () => {
+      if (typeof window === "undefined") return;
+
+      const lastActivity = parseInt(
+        localStorage.getItem("lazorkit_last_activity") || "0"
+      );
+      
+      const elapsed = Date.now() - lastActivity;
+      const remaining = expiryDuration - elapsed;
+
+      setTimeRemaining(remaining);
+
+      // Show warning if approaching expiry
+      if (remaining <= warningThreshold && remaining > 0) {
+        if (!showWarning) {
+          setShowWarning(true);
+          onWarning?.();
+        }
+      }
+
+      // Force disconnect if expired
+      if (remaining <= 0) {
+        onExpiry?.();
+        disconnect();
+        localStorage.removeItem("lazorkit_last_activity");
+      }
+    };
+
+    // Check every 10 seconds
+    const interval = setInterval(checkExpiry, 10000);
+    checkExpiry(); // Check immediately
+
+    return () => clearInterval(interval);
+  }, [isConnected, expiryDuration, warningThreshold, showWarning, onWarning, onExpiry, disconnect]);
+
+  // Update activity on user interaction
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const handleActivity = () => extendSession();
+
+    // Listen to user activity events
+    window.addEventListener("mousedown", handleActivity);
+    window.addEventListener("keydown", handleActivity);
+    window.addEventListener("scroll", handleActivity);
+    window.addEventListener("touchstart", handleActivity);
+
+    return () => {
+      window.removeEventListener("mousedown", handleActivity);
+      window.removeEventListener("keydown", handleActivity);
+      window.removeEventListener("scroll", handleActivity);
+      window.removeEventListener("touchstart", handleActivity);
+    };
+  }, [isConnected, extendSession]);
+
+  return {
+    showWarning,
+    timeRemaining,
+    extendSession
+  };
+}
+```
+
+## Step 5: Session Warning Component
+
+Create `src/components/SessionWarning.tsx`:
+
+```typescript
+"use client";
+
+import { useSessionExpiry } from "@/hooks/useSessionExpiry";
+import { useWallet } from "@lazorkit/wallet";
+
+export function SessionWarning() {
+  const { isConnected } = useWallet();
+  const { showWarning, timeRemaining, extendSession } = useSessionExpiry({
+    warningThreshold: 5 * 60 * 1000, // Show warning at 5 minutes
+    expiryDuration: 30 * 60 * 1000,  // Expire after 30 minutes
+    onWarning: () => {
+      console.log("⚠️ Session expiring soon");
+    },
+    onExpiry: () => {
+      console.log("❌ Session expired");
+    }
+  });
+
+  if (!isConnected || !showWarning) {
+    return null;
+  }
+
+  const minutes = Math.floor((timeRemaining || 0) / 60000);
+  const seconds = Math.floor(((timeRemaining || 0) % 60000) / 1000);
+
+  return (
+    <div className="fixed bottom-4 right-4 max-w-md p-6 bg-yellow-50 
+                    border-2 border-yellow-300 rounded-lg shadow-lg z-50">
+      <div className="flex items-start gap-3">
+        <div className="text-2xl">⏰</div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-yellow-900 mb-2">
+            Session Expiring Soon
+          </h3>
+          <p className="text-sm text-yellow-800 mb-3">
+            Your session will expire in {minutes}:{seconds.toString().padStart(2, '0')}.
+            Click below to extend your session.
+          </p>
+          <button
+            onClick={extendSession}
+            className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg 
+                       font-medium hover:bg-yellow-700 transition-colors"
+          >
+            Extend Session
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+## Step 6: Multi-Tab Synchronization
+
+Create `src/hooks/useMultiTabSync.ts`:
+
+```typescript
+"use client";
+
+import { useWallet } from "@lazorkit/wallet";
+import { useEffect } from "react";
+
+export function useMultiTabSync() {
+  const { isConnected, disconnect, connect } = useWallet();
+
+  useEffect(() => {
+    // Listen for storage changes from other tabs
+    const handleStorageChange = async (e: StorageEvent) => {
+      // Lazorkit uses its own storage keys - this is just an example
+      // of how you might sync custom state across tabs
+      
+      if (e.key === "lazorkit_session_state") {
+        if (e.newValue === "disconnected" && isConnected) {
+          console.log("🔄 Session disconnected in another tab");
+          await disconnect();
+        } else if (e.newValue === "connected" && !isConnected) {
+          console.log("🔄 Session connected in another tab");
+          // Optionally trigger reconnect
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, [isConnected, disconnect, connect]);
+
+  // Broadcast connection state changes to other tabs
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    localStorage.setItem(
+      "lazorkit_session_state",
+      isConnected ? "connected" : "disconnected"
+    );
+  }, [isConnected]);
+}
+```
+
+## Step 7: Complete Session Management Setup
+
+Update `src/app/providers.tsx`:
+
+```typescript
+"use client";
+
+import React, { useEffect } from "react";
+import { LazorkitProvider } from "@lazorkit/wallet";
+import { Buffer } from "buffer";
+import { SessionWarning } from "@/components/SessionWarning";
+
+const LAZORKIT_CONFIG = {
+  rpcUrl: process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com",
+  portalUrl: process.env.NEXT_PUBLIC_PORTAL_URL || "https://portal.lazor.sh",
+  paymasterUrl: process.env.NEXT_PUBLIC_PAYMASTER_URL,
+};
+
+export function AppProviders({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    if (typeof window !== "undefined" && !window.Buffer) {
+      window.Buffer = Buffer;
+    }
+  }, []);
+
+  return (
+    <LazorkitProvider
+      rpcUrl={LAZORKIT_CONFIG.rpcUrl}
+      portalUrl={LAZORKIT_CONFIG.portalUrl}
+      paymasterUrl={LAZORKIT_CONFIG.paymasterUrl}
+    >
+      {children}
+      <SessionWarning />
+    </LazorkitProvider>
+  );
+}
+```
+
+## Step 8: Add Session Components to Page
+
+Update `src/app/page.tsx`:
+
+```typescript
+"use client";
+
+import { ConnectButton } from "@/components/ConnectButton";
+import { WalletInfo } from "@/components/WalletInfo";
+import { SessionStatus } from "@/components/SessionStatus";
+import { useMultiTabSync } from "@/hooks/useMultiTabSync";
+
+export default function Home() {
+  // Enable multi-tab synchronization
+  useMultiTabSync();
+
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-4xl mx-auto space-y-8 py-12">
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl font-bold text-gray-900">
+            Session Management Demo
+          </h1>
+          <p className="text-lg text-gray-600">
+            Persistent sessions with auto-reconnect
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
+          <ConnectButton />
+          <WalletInfo />
+          <SessionStatus />
+        </div>
+      </div>
+    </main>
+  );
+}
+```
+
+## Testing Session Persistence
+
+### Test 1: Page Reload
+1. Connect your wallet
+2. Refresh the page (F5 or Cmd+R)
+3. ✅ Session should restore automatically
+4. No need to reconnect!
+
+### Test 2: Multi-Tab Sync
+1. Open your app in two browser tabs
+2. Connect wallet in Tab 1
+3. Switch to Tab 2
+4. ✅ Tab 2 should show connected state
+
+### Test 3: Session Expiry
+1. Connect wallet
+2. Wait for warning (adjust `warningThreshold` for faster testing)
+3. Click "Extend Session"
+4. ✅ Warning should disappear
+
+## Security Best Practices
+
+### 1. Secure Credential Storage
+```typescript
+// Lazorkit handles this automatically, but for custom data:
+const storeSecurely = (key: string, value: string) => {
+  // Never store sensitive data in plain localStorage
+  // Use encrypted storage or secure cookies
+  sessionStorage.setItem(key, value);
+};
+```
+
+### 2. Session Timeout
+```typescript
+// Always implement session timeouts
+const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+// Force re-authentication periodically for sensitive operations
+const requireReauth = async () => {
+  const lastAuth = parseInt(localStorage.getItem("last_auth") || "0");
+  const elapsed = Date.now() - lastAuth;
+  
+  if (elapsed > SESSION_TIMEOUT) {
+    await disconnect();
+    await connect(); // Prompt for re-authentication
+  }
+};
+```
+
+### 3. Clear Sensitive Data on Logout
+```typescript
+const secureDisconnect = async () => {
+  // Clear session data
+  sessionStorage.clear();
+  localStorage.removeItem("lazorkit_last_activity");
+  
+  // Disconnect wallet
+  await disconnect();
+};
+```
+
+## Common Issues & Solutions
+
+### Issue: Session doesn't persist after reload
+**Solution:** Ensure you're not blocking browser storage. Check browser settings.
+
+### Issue: Multiple connection prompts
+**Solution:** Wait for Lazorkit's auto-reconnect to complete before calling `connect()`.
+
+### Issue: Session expires too quickly
+**Solution:** Adjust `expiryDuration` in `useSessionExpiry` hook.
+
+### Issue: Multi-tab sync not working
+**Solution:** Ensure both tabs are from the same origin. localStorage is origin-specific.
+
+## Performance Considerations
+
+### 1. Debounce Activity Tracking
+```typescript
+let activityTimeout: NodeJS.Timeout;
+
+const debouncedActivity = () => {
+  clearTimeout(activityTimeout);
+  activityTimeout = setTimeout(() => {
+    updateLastActivity();
+  }, 5000); // Update at most every 5 seconds
+};
+```
+
+### 2. Lazy Load Session Components
+```typescript
+import dynamic from 'next/dynamic';
+
+const SessionWarning = dynamic(
+  () => import('@/components/SessionWarning'),
+  { ssr: false }
+);
+```
+
+## Advanced: Session Recovery
+
+Implement session recovery for network interruptions:
+
+```typescript
+const useSessionRecovery = () => {
+  const { isConnected, connect, error } = useWallet();
+  const [isRecovering, setIsRecovering] = useState(false);
+
+  useEffect(() => {
+    if (error && error.message.includes("network")) {
+      setIsRecovering(true);
+      
+      // Attempt recovery after 3 seconds
+      setTimeout(async () => {
+        try {
+          await connect();
+          setIsRecovering(false);
+        } catch {
+          // Recovery failed
+          setIsRecovering(false);
+        }
+      }, 3000);
+    }
+  }, [error, connect]);
+
+  return { isRecovering };
+};
+```
+
+## Next Steps
+
+You now have a complete session management system! Consider:
+- Implementing session analytics
+- Adding session history tracking
+- Building admin session management tools
+- Creating session backup/restore functionality
+
+## Resources
+
+- [Web Storage API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API)
+- [WebAuthn Session Management](https://webauthn.guide/)
+- [Lazorkit Documentation](https://docs.lazorkit.com/)
+
+---
+
+**Congratulations!** 🎉 You've implemented robust session management with auto-reconnect and multi-tab sync!
