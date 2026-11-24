@@ -15,6 +15,10 @@ jobs:
         with:
           node-version: "22"
       - run: npm install
+      - name: Report production dependency advisories
+        run: |
+          npm audit --omit=dev --json > audit-report.json || true
+          node -e 'const a=require("./audit-report.json"); console.log(JSON.stringify(Object.entries(a.vulnerabilities || {}).map(([name,v]) => ({name, severity:v.severity, range:v.range, direct:v.isDirect, fixAvailable:v.fixAvailable})), null, 2))'
       - run: npm run type-check
       - run: npm run lint
       - run: npm run build
