@@ -52,7 +52,7 @@ npm run build
 npm start
 ```
 
-Run all checks before opening a pull request or deploying. The repository does not yet include a committed npm lockfile; `npm install` will resolve dependencies locally. Commit the generated lockfile after reviewing it so CI and deployments can use reproducible installs.
+Run all checks before opening a pull request or deploying. CI currently uses `npm install`. The repository does not yet include a committed npm lockfile; `npm install` will resolve dependencies locally. Commit the generated lockfile after reviewing it so CI and deployments can use reproducible installs.
 
 ## Deployment
 
