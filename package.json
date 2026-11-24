@@ -1,0 +1,48 @@
+{
+  "name": "lazorkit-nextjs-starter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Next.js demo for passkey wallets and gasless Solana Devnet transactions using Lazorkit",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lazorkit/wallet": "^1.4.8",
+    "@solana/spl-token": "^0.4.8",
+    "@solana/web3.js": "^1.95.3",
+    "buffer": "^6.0.3",
+    "next": "15.5.28",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.28",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5"
+  },
+  "keywords": [
+    "solana",
+    "passkey",
+    "webauthn",
+    "lazorkit",
+    "wallet",
+    "nextjs",
+    "typescript",
+    "starter-template"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Godson47/lazorkit-nextjs-starter"
+  }
+}
