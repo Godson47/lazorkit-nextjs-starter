@@ -1,231 +1,96 @@
-# 🔐 Lazorkit Next.js Starter Template
+# Lazorkit Next.js Starter
 
-A production-ready Next.js starter template demonstrating Lazorkit SDK integration for passkey-based wallet authentication and gasless transactions on Solana.
+An educational Next.js App Router demo of passkey wallet connection and gasless transactions using the Lazorkit SDK on **Solana Devnet**.
 
-## 🎯 What This Is
+> **Important:** this is a learning starter, not a production wallet or audited financial application. The current demo is configured for Devnet. Do not use it for mainnet funds without a security review, transaction-flow testing, provider/API compatibility checks, and a threat model.
 
-This is a **working code example** (not a full product) that shows developers how to integrate Lazorkit SDK in a real-world Next.js environment. It demonstrates:
+## Stack
 
-- ✅ Passkey-based wallet creation (no seed phrases!)
-- ✅ Gasless USDC transfers on Solana Devnet
-- ✅ Session persistence across browser tabs
-- ✅ Clean, reusable component architecture
-- ✅ TypeScript support with full type safety
+- Next.js App Router and React
+- TypeScript
+- Lazorkit wallet SDK
+- Solana Web3.js and SPL Token libraries
+- Tailwind CSS
 
-## 🚀 Quick Start
+## Prerequisites
 
-### Prerequisites
+- Node.js 20 or newer
+- npm
+- A modern browser with WebAuthn/passkey support
+- HTTPS or localhost for browser passkey APIs
 
-- Node.js 18+ and npm/yarn/pnpm
-- Modern browser with WebAuthn support (Chrome, Safari, Edge, etc.)
-- Basic understanding of React and Solana
-
-### Installation
+## Quick start
 
 ```bash
-# Clone this repository
-git clone https://github.com/yourusername/lazorkit-nextjs-starter
+git clone https://github.com/Godson47/lazorkit-nextjs-starter.git
 cd lazorkit-nextjs-starter
-
-# Install dependencies
 npm install
-# or
-yarn install
-# or
-pnpm install
+cp .env.example .env.local
+npm run dev
 ```
 
-### Environment Setup
+Open http://localhost:3000.
 
-Create a `.env.local` file in the root directory:
+Windows PowerShell users can copy the file with `Copy-Item .env.example .env.local`.
 
-```env
-# Solana RPC URL (Devnet for testing)
-NEXT_PUBLIC_RPC_URL=https://api.devnet.solana.com
+## Environment configuration
 
-# Lazorkit Portal URL
-NEXT_PUBLIC_PORTAL_URL=https://portal.lazor.sh
+The app defaults to Solana Devnet and the Lazorkit Devnet portal/paymaster. Override only when you know the correct endpoint values:
 
-# Lazorkit Paymaster URL (for gasless transactions)
-NEXT_PUBLIC_PAYMASTER_URL=https://kora.devnet.lazorkit.com
+- `NEXT_PUBLIC_RPC_URL`: Solana RPC endpoint
+- `NEXT_PUBLIC_PORTAL_URL`: Lazorkit portal URL
+- `NEXT_PUBLIC_PAYMASTER_URL`: Devnet paymaster URL
 
-# Optional: Paymaster API Key (if required)
-# NEXT_PUBLIC_PAYMASTER_API_KEY=your_api_key_here
-```
+These are public client-side configuration values, not secrets. Never put private keys, seed phrases, signing secrets, or privileged API tokens in `NEXT_PUBLIC_*` variables. Do not commit `.env.local`.
 
-### Run the Development Server
+## Checks
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
+npm run type-check
+npm run lint
+npm run build
+npm start
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Run all checks before opening a pull request or deploying. CI currently uses `npm install`. The repository does not yet include a committed npm lockfile; `npm install` will resolve dependencies locally. Commit the generated lockfile after reviewing it so CI and deployments can use reproducible installs.
 
-## 📁 Project Structure
+## Deployment
 
-```
-lazorkit-nextjs-starter/
-├── src/
-│   ├── app/
-│   │   ├── layout.tsx          # Root layout with providers
-│   │   ├── page.tsx            # Main demo page
-│   │   └── providers.tsx       # Lazorkit provider setup
-│   ├── components/
-│   │   ├── ConnectButton.tsx   # Passkey connect/disconnect
-│   │   ├── WalletInfo.tsx      # Display wallet details
-│   │   ├── GaslessTransfer.tsx # Gasless USDC transfer
-│   │   └── StatusPanel.tsx     # Real-time status display
-│   ├── lib/
-│   │   ├── config.ts           # Lazorkit configuration
-│   │   └── utils.ts            # Utility functions
-│   └── styles/
-│       └── globals.css         # Global styles
-├── docs/
-│   ├── tutorial-01-passkey-wallet.md
-│   ├── tutorial-02-gasless-transactions.md
-│   └── tutorial-03-session-management.md
-├── .env.local.example
-├── package.json
-└── README.md
-```
+The app can be deployed to a Node.js-compatible host such as Vercel:
 
-## 📚 Step-by-Step Tutorials
+- Framework: Next.js
+- Build command: `npm run build`
+- Start command: `npm start` (for a self-hosted Node deployment)
+- Set the three public environment variables only if overriding the Devnet defaults.
+- Use HTTPS and test passkey behavior on the deployed domain.
 
-### [Tutorial 1: Creating a Passkey-Based Wallet](docs/tutorial-01-passkey-wallet.md)
+## Project structure
 
-Learn how to:
-- Set up the Lazorkit provider
-- Create a passkey wallet with biometric authentication
-- Handle connection states and errors
-- Display wallet information
-
-### [Tutorial 2: Gasless USDC Transfers](docs/tutorial-02-gasless-transactions.md)
-
-Learn how to:
-- Build transaction instructions
-- Use the paymaster for gasless transactions
-- Sign and send transactions
-- Handle transaction confirmations
-
-### [Tutorial 3: Session Persistence](docs/tutorial-03-session-management.md)
-
-Learn how to:
-- Maintain wallet sessions across browser tabs
-- Auto-reconnect on page reload
-- Handle session expiration
-- Secure session management best practices
-
-## 🎨 Live Demo
-
-**Deployed on Devnet:** [https://lazorkit-starter.vercel.app](https://lazorkit-starter.vercel.app)
-
-Try it yourself:
-1. Click "Connect Passkey Wallet"
-2. Create a passkey using Face ID/Touch ID/Windows Hello
-3. View your smart wallet address
-4. Try a gasless USDC transfer
-
-## 🔑 Key Features Demonstrated
-
-### 1. Passkey Authentication
-```typescript
-const { connect, disconnect, isConnected } = useWallet();
-
-// Connect with passkey
-await connect({ feeMode: 'paymaster' });
-
-// User authenticates with biometric (Face ID/Touch ID)
-// No seed phrases, no browser extensions needed!
+```text
+app/
+  globals.css
+  layout.tsx
+  page.tsx
+  providers.tsx
+package.json
+next.config.ts
+postcss.config.js
+tailwind.config.ts
+tsconfig.json
+eslint.config.mjs
+.env.example
 ```
 
-### 2. Gasless Transactions
-```typescript
-const { signAndSendTransaction, smartWalletPubkey } = useWallet();
+The extensionless tutorial and setup-guide files in the repository are supporting notes, not files loaded by Next.js.
 
-const instruction = SystemProgram.transfer({
-  fromPubkey: smartWalletPubkey,
-  toPubkey: recipient,
-  lamports: amount
-});
+## Before production use
 
-// Transaction fee paid by paymaster!
-const signature = await signAndSendTransaction({ instructions: [instruction] });
-```
+- Confirm the installed Lazorkit SDK version and provider props match the current official SDK.
+- Test connection, disconnection, failed transactions, rejected passkeys, network errors, and mobile browsers.
+- Review transaction construction and token-account handling; do not assume examples are safe for arbitrary token mints or recipients.
+- Add automated tests and CI checks, and review dependency advisories.
+- Keep the default network on Devnet until the application is explicitly reviewed for mainnet use.
 
-### 3. Type-Safe Integration
-Full TypeScript support with proper types for all Lazorkit SDK methods and Solana Web3.js integration.
+## License
 
-## 🛠️ Built With
-
-- [Next.js 15](https://nextjs.org/) - React framework
-- [Lazorkit SDK](https://lazorkit.com/) - Passkey wallet infrastructure
-- [@solana/web3.js](https://solana.com/) - Solana JavaScript API
-- [TypeScript](https://www.typescriptlang.org/) - Type safety
-- [Tailwind CSS](https://tailwindcss.com/) - Styling
-
-## ⚠️ Important Notes
-
-- **Devnet Only**: This demo runs on Solana Devnet. Do not use real funds.
-- **Pre-Audit**: Lazorkit is pre-audit. Not for production use yet.
-- **Browser Support**: Requires WebAuthn support (Chrome 67+, Safari 13+, Edge 18+)
-
-## 🐛 Troubleshooting
-
-### Passkey creation fails
-- Ensure you're using HTTPS (required for WebAuthn)
-- Check browser console for errors
-- Verify your browser supports WebAuthn
-
-### Transaction fails
-- Ensure wallet has SOL for non-gasless transactions
-- Check Devnet RPC URL is accessible
-- Verify paymaster URL is correct for gasless transactions
-
-### Session not persisting
-- Check browser storage permissions
-- Clear browser cache and try again
-- Ensure cookies are enabled
-
-## 📖 Additional Resources
-
-- [Lazorkit Documentation](https://docs.lazorkit.com/)
-- [Lazorkit Cookbook](https://lazorkit-cookbook.vercel.app/)
-- [Telegram Community](https://t.me/lazorkit)
-- [GitHub Repository](https://github.com/lazor-kit/lazor-kit)
-
-## 🤝 Contributing
-
-This is a bounty submission example. For the full Lazorkit SDK:
-1. Join the [Telegram group](https://t.me/lazorkit)
-2. Check the [GitHub issues](https://github.com/lazor-kit/lazor-kit/issues)
-3. Submit PRs with clear descriptions
-
-## 📄 License
-
-MIT License - feel free to use this starter template for your own projects!
-
-## 💡 Next Steps
-
-After exploring this starter:
-
-1. **Build Your dApp**: Use this as a foundation for your Solana application
-2. **Add Token Swaps**: Integrate Raydium or Jupiter for DEX functionality
-3. **Implement NFT Minting**: Use Metaplex for NFT operations
-4. **Add Staking**: Integrate with staking protocols like Marinade
-5. **Go Mobile**: Check out the React Native version for mobile apps
-
-## 🙋 Support
-
-- **Documentation Issues**: [docs.lazorkit.com](https://docs.lazorkit.com/)
-- **SDK Bugs**: [GitHub Issues](https://github.com/lazor-kit/lazor-kit/issues)
-- **Community Help**: [Telegram](https://t.me/lazorkit)
-
----
-
-**Built with ❤️ for the Lazorkit Bounty**
-
-If you found this starter helpful, give it a ⭐ on GitHub!
+MIT.

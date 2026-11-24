@@ -81,13 +81,12 @@ function WalletCard() {
     isConnected, 
     isConnecting, 
     smartWalletPubkey,
-    account,
     error 
   } = useWallet();
 
   const handleConnect = async () => {
     try {
-      await connect({ feeMode: "paymaster" });
+      await connect();
     } catch (err) {
       console.error("Connection failed:", err);
     }
@@ -164,19 +163,6 @@ function WalletCard() {
                 </div>
               </div>
 
-              {/* Credential ID */}
-              {account?.credentialId && (
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <label className="block text-sm font-medium text-blue-800 mb-2">
-                    Passkey Credential ID
-                  </label>
-                  <code className="block p-3 bg-white rounded border border-blue-300 
-                                 text-xs font-mono text-blue-900 break-all">
-                    {account.credentialId}
-                  </code>
-                </div>
-              )}
-
               {/* Status Indicator */}
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-2">
@@ -238,8 +224,15 @@ function TransferCard() {
       setError(null);
       setTxSignature(null);
 
-      const recipientPubkey = new PublicKey(recipient);
-      const lamports = parseFloat(amount) * LAMPORTS_PER_SOL;
+      const recipientPubkey = new PublicKey(recipient.trim());
+      const solAmount = Number(amount);
+      if (!Number.isFinite(solAmount) || solAmount <= 0) {
+        throw new Error("Enter a valid SOL amount greater than zero.");
+      }
+      const lamports = Math.round(solAmount * LAMPORTS_PER_SOL);
+      if (!Number.isSafeInteger(lamports) || lamports <= 0) {
+        throw new Error("The amount is outside the supported range.");
+      }
 
       const instruction = SystemProgram.transfer({
         fromPubkey: smartWalletPubkey,
@@ -247,9 +240,7 @@ function TransferCard() {
         lamports: lamports
       });
 
-      const signature = await signAndSendTransaction({
-        instructions: [instruction]
-      });
+      const signature = await signAndSendTransaction(instruction);
 
       setTxSignature(signature);
       setRecipient("");
