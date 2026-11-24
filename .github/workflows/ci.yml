@@ -1,3 +1,4 @@
+# CI checks are required before treating this starter as deployable.
 name: Next.js CI
 on:
   pull_request:
